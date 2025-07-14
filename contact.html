@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact Us - Real Estate AI</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <style>
+      :root {
+        --primary-teal: #0d9488;
+        --secondary-coral: #f87171;
+        --accent-gold: #fef08a;
+        --neutral-bg: #fafafa;
+        --card-bg: #ffffff;
+        --text-dark: #1f2937;
+        --text-light: #6b7280;
+        --border-gray: #e5e7eb;
+        --shadow-light: rgba(0, 0, 0, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Roboto", sans-serif;
+        background-color: var(--neutral-bg);
+        color: var(--text-dark);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        flex: 1;
+      }
+
+      header {
+        background: linear-gradient(135deg, var(--primary-teal), #0891b2);
+        color: #ffffff;
+        padding: 60px 20px;
+        border-radius: 8px;
+        margin-bottom: 40px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+
+      header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
+        background-size: cover;
+        opacity: 0.2;
+      }
+
+      header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        position: relative;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      header p {
+        font-size: 1.2rem;
+        max-width: 700px;
+        margin: 0 auto 30px;
+        position: relative;
+      }
+
+      .contact-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-bottom: 40px;
+      }
+
+      @media (max-width: 768px) {
+        .contact-container {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .contact-info-card {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px var(--shadow-light);
+      }
+
+      .contact-form-card {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px var(--shadow-light);
+      }
+
+      .contact-section-title {
+        font-size: 1.8rem;
+        color: var(--primary-teal);
+        margin-bottom: 25px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--accent-gold);
+      }
+
+      .contact-method {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 25px;
+      }
+
+      .contact-icon {
+        width: 50px;
+        height: 50px;
+        background: rgba(13, 148, 136, 0.1);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        color: var(--primary-teal);
+        margin-right: 20px;
+        flex-shrink: 0;
+      }
+
+      .contact-details h3 {
+        font-size: 1.3rem;
+        margin-bottom: 5px;
+        color: var(--text-dark);
+      }
+
+      .contact-details p {
+        color: var(--text-light);
+        line-height: 1.6;
+      }
+
+      .hours-list {
+        list-style: none;
+        margin-top: 20px;
+      }
+
+      .hours-list li {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-gray);
+      }
+
+      .hours-list li:last-child {
+        border-bottom: none;
+      }
+
+      .hours-day {
+        font-weight: 600;
+      }
+
+      .hours-time {
+        color: var(--text-light);
+      }
+
+      .map-container {
+        height: 300px;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 30px;
+        background: #e9ecef;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .map-container i {
+        font-size: 3rem;
+        color: var(--text-light);
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-dark);
+      }
+
+      .form-group input,
+      .form-group textarea,
+      .form-group select {
+        width: 100%;
+        padding: 14px;
+        border: 1px solid var(--border-gray);
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+      }
+
+      .form-group textarea {
+        min-height: 150px;
+        resize: vertical;
+      }
+
+      .form-group input:focus,
+      .form-group textarea:focus,
+      .form-group select:focus {
+        border-color: var(--primary-teal);
+        box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+        outline: none;
+      }
+
+      button {
+        width: 100%;
+        padding: 14px;
+        background-color: var(--primary-teal);
+        color: white;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.1rem;
+      }
+
+      button:hover {
+        background-color: #0f766e;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .back-link {
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .back-link a {
+        color: var(--primary-teal);
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 12px 25px;
+        background-color: white;
+        border-radius: 30px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      .back-link a:hover {
+        background-color: var(--accent-gold);
+        text-decoration: none;
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+      }
+
+      footer {
+        background: var(--primary-teal);
+        color: white;
+        padding: 40px 0;
+        margin-top: 80px;
+        border-radius: 8px;
+      }
+
+      .footer-content {
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .footer-logo {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        display: inline-block;
+      }
+
+      .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin: 30px 0;
+        flex-wrap: wrap;
+      }
+
+      .footer-links a {
+        color: white;
+        text-decoration: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .footer-links a:hover {
+        opacity: 0.8;
+      }
+
+      .copyright {
+        margin-top: 20px;
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+
+      .success-message {
+        background-color: #d1fae5;
+        color: #065f46;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+        text-align: center;
+        display: none;
+      }
+
+      @media (max-width: 768px) {
+        header h1 {
+          font-size: 2rem;
+        }
+
+        .contact-container {
+          padding: 0 10px;
+        }
+
+        .contact-info-card,
+        .contact-form-card {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Contact Us</h1>
+        <p>We're here to answer your questions and provide assistance</p>
+      </header>
+
+      <div class="contact-container">
+        <!-- Contact Information Card -->
+        <div class="contact-info-card">
+          <h2 class="contact-section-title">Get In Touch</h2>
+
+          <div class="contact-method">
+            <div class="contact-icon">
+              <i class="fas fa-map-marker-alt"></i>
+            </div>
+            <div class="contact-details">
+              <h3>Our Location</h3>
+              <p>
+                123 Innovation Drive<br />Tech City, CA 94043<br />United States
+              </p>
+            </div>
+          </div>
+
+          <div class="contact-method">
+            <div class="contact-icon">
+              <i class="fas fa-phone"></i>
+            </div>
+            <div class="contact-details">
+              <h3>Phone</h3>
+              <p>Main: (555) 123-4567<br />Support: (555) 987-6543</p>
+            </div>
+          </div>
+
+          <div class="contact-method">
+            <div class="contact-icon">
+              <i class="fas fa-envelope"></i>
+            </div>
+            <div class="contact-details">
+              <h3>Email</h3>
+              <p>
+                General: info@realestateai.com<br />Support:
+                support@realestateai.com
+              </p>
+            </div>
+          </div>
+
+          <div class="contact-method">
+            <div class="contact-icon">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="contact-details">
+              <h3>Business Hours</h3>
+              <ul class="hours-list">
+                <li>
+                  <span class="hours-day">Monday - Friday</span>
+                  <span class="hours-time">9:00 AM - 6:00 PM</span>
+                </li>
+                <li>
+                  <span class="hours-day">Saturday</span>
+                  <span class="hours-time">10:00 AM - 4:00 PM</span>
+                </li>
+                <li>
+                  <span class="hours-day">Sunday</span>
+                  <span class="hours-time">Closed</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="map-container" id="map">
+            <i class="fas fa-map-marked-alt"></i>
+          </div>
+        </div>
+
+        <!-- Contact Form Card -->
+        <div class="contact-form-card">
+          <h2 class="contact-section-title">Send Us a Message</h2>
+
+          <form id="contactForm">
+            <div class="form-group">
+              <label for="name">Full Name:</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                placeholder="Enter your full name"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="email">Email Address:</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                placeholder="Enter your email"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="phone">Phone Number:</label>
+              <input
+                type="tel"
+                id="phone"
+                name="phone"
+                placeholder="Enter your phone number"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="subject">Subject:</label>
+              <select id="subject" name="subject" required>
+                <option value="">Select a subject</option>
+                <option value="general">General Inquiry</option>
+                <option value="support">Technical Support</option>
+                <option value="properties">Property Information</option>
+                <option value="partnership">Business Partnership</option>
+                <option value="feedback">Feedback & Suggestions</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="message">Your Message:</label>
+              <textarea
+                id="message"
+                name="message"
+                required
+                placeholder="How can we help you?"
+              ></textarea>
+            </div>
+
+            <button type="submit">Send Message</button>
+          </form>
+
+          <div class="success-message" id="successMessage">
+            <i class="fas fa-check-circle"></i> Your message has been sent
+            successfully!
+          </div>
+        </div>
+      </div>
+
+      <div class="back-link">
+        <a href="index.html"><i class="fas fa-arrow-left"></i> Back to Home</a>
+      </div>
+
+      <footer>
+        <div class="footer-content">
+          <div class="footer-logo">RealEstate AI</div>
+          <p>Intelligent solutions for modern real estate needs</p>
+
+          <div class="footer-links">
+            <a href="index.html">Home</a>
+            <a href="properties.html">Properties</a>
+            <a href="about.html">About Us</a>
+            <a href="contact.html">Contact</a>
+            <a href="terms.html">Terms</a>
+            <a href="privacy.html">Privacy</a>
+          </div>
+
+          <div class="copyright">
+            &copy; 2025 Real Estate AI. All rights reserved.
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      // Initialize map
+      function initMap() {
+        const map = L.map("map").setView([37.7749, -122.4194], 13);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(map);
+
+        L.marker([37.7749, -122.4194])
+          .addTo(map)
+          .bindPopup("Real Estate AI Headquarters<br>123 Innovation Drive")
+          .openPopup();
+      }
+
+      // Initialize map when the page loads
+      window.addEventListener("DOMContentLoaded", initMap);
+
+      // Form submission handling
+      document
+        .getElementById("contactForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault();
+
+          // Simulate form submission
+          setTimeout(() => {
+            // Show success message
+            const successMessage = document.getElementById("successMessage");
+            successMessage.style.display = "block";
+
+            // Reset form
+            this.reset();
+
+            // Hide success message after 5 seconds
+            setTimeout(() => {
+              successMessage.style.display = "none";
+            }, 5000);
+          }, 1000);
+        });
+    </script>
+  </body>
+</html>

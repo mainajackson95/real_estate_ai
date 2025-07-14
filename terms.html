@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terms of Service - Real Estate AI</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      :root {
+        --primary-teal: #0d9488;
+        --secondary-coral: #f87171;
+        --accent-gold: #fef08a;
+        --neutral-bg: #fafafa;
+        --card-bg: #ffffff;
+        --text-dark: #1f2937;
+        --text-light: #6b7280;
+        --border-gray: #e5e7eb;
+        --shadow-light: rgba(0, 0, 0, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Roboto", sans-serif;
+        background-color: var(--neutral-bg);
+        color: var(--text-dark);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        flex: 1;
+      }
+
+      header {
+        background: linear-gradient(135deg, var(--primary-teal), #0891b2);
+        color: #ffffff;
+        padding: 60px 20px;
+        border-radius: 8px;
+        margin-bottom: 40px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+
+      header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
+        background-size: cover;
+        opacity: 0.2;
+      }
+
+      header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        position: relative;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .terms-content {
+        background: var(--card-bg);
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px var(--shadow-light);
+        margin-bottom: 40px;
+      }
+
+      .terms-intro {
+        margin-bottom: 40px;
+      }
+
+      .terms-intro p {
+        font-size: 1.1rem;
+        margin-bottom: 20px;
+      }
+
+      .terms-section {
+        margin-bottom: 40px;
+      }
+
+      .terms-section h2 {
+        font-size: 1.8rem;
+        color: var(--primary-teal);
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--accent-gold);
+      }
+
+      .terms-section h3 {
+        font-size: 1.4rem;
+        color: var(--primary-teal);
+        margin: 25px 0 15px;
+      }
+
+      .terms-section p {
+        margin-bottom: 15px;
+        font-size: 1.05rem;
+        line-height: 1.7;
+      }
+
+      .terms-section ul {
+        margin-left: 30px;
+        margin-bottom: 20px;
+      }
+
+      .terms-section li {
+        margin-bottom: 10px;
+        line-height: 1.6;
+      }
+
+      .terms-section table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        background: #f8fafc;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .terms-section th,
+      .terms-section td {
+        padding: 15px;
+        text-align: left;
+        border: 1px solid var(--border-gray);
+      }
+
+      .terms-section th {
+        background-color: var(--primary-teal);
+        color: white;
+        font-weight: 600;
+      }
+
+      .terms-section tr:nth-child(even) {
+        background-color: #f0fdfa;
+      }
+
+      .contact-info {
+        background: #f0fdfa;
+        border-left: 4px solid var(--primary-teal);
+        padding: 20px;
+        border-radius: 8px;
+        margin: 30px 0;
+      }
+
+      .contact-info p {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .contact-info i {
+        color: var(--primary-teal);
+        font-size: 1.2rem;
+      }
+
+      .back-link {
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .back-link a {
+        color: var(--primary-teal);
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 12px 25px;
+        background-color: white;
+        border-radius: 30px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      .back-link a:hover {
+        background-color: var(--accent-gold);
+        text-decoration: none;
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+      }
+
+      footer {
+        background: var(--primary-teal);
+        color: white;
+        padding: 40px 0;
+        margin-top: 80px;
+        border-radius: 8px;
+      }
+
+      .footer-content {
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .footer-logo {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        display: inline-block;
+      }
+
+      .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin: 30px 0;
+        flex-wrap: wrap;
+      }
+
+      .footer-links a {
+        color: white;
+        text-decoration: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .footer-links a:hover {
+        opacity: 0.8;
+      }
+
+      .copyright {
+        margin-top: 20px;
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+
+      @media (max-width: 768px) {
+        header h1 {
+          font-size: 2rem;
+        }
+
+        .terms-content {
+          padding: 30px 20px;
+        }
+
+        .terms-section h2 {
+          font-size: 1.6rem;
+        }
+
+        .terms-section h3 {
+          font-size: 1.3rem;
+        }
+
+        .footer-links {
+          flex-direction: column;
+          gap: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Terms of Service</h1>
+        <p>Last Updated: July 8, 2025</p>
+      </header>
+
+      <div class="terms-content">
+        <div class="terms-intro">
+          <p>
+            Welcome to Real Estate AI! These Terms of Service ("Terms") govern
+            your access to and use of our website, platform, and services. By
+            accessing or using our services, you agree to be bound by these
+            Terms. If you do not agree to these Terms, please do not use our
+            services.
+          </p>
+          <p>
+            Real Estate AI provides intelligent property solutions through our
+            AI-powered platform. These Terms apply to all visitors, users, and
+            others who access or use our services.
+          </p>
+        </div>
+
+        <div class="terms-section">
+          <h2>1. Acceptance of Terms</h2>
+          <p>
+            By accessing or using the Real Estate AI platform, you agree to be
+            bound by these Terms of Service, our Privacy Policy, and all
+            applicable laws and regulations. If you do not agree with any part
+            of these terms, you may not access the platform.
+          </p>
+          <p>
+            We reserve the right to modify these Terms at any time. We will
+            provide notice of any changes by updating the "Last Updated" date at
+            the top of this page. Your continued use of our services after any
+            changes constitutes your acceptance of the revised Terms.
+          </p>
+        </div>
+
+        <div class="terms-section">
+          <h2>2. Account Registration</h2>
+          <p>
+            To access certain features of our services, you may be required to
+            create an account. When creating an account, you agree to:
+          </p>
+          <ul>
+            <li>Provide accurate, current, and complete information</li>
+            <li>
+              Maintain the security of your password and accept all risks of
+              unauthorized access
+            </li>
+            <li>Promptly update your account information if it changes</li>
+            <li>
+              Be responsible for all activities that occur under your account
+            </li>
+          </ul>
+          <p>
+            We reserve the right to suspend or terminate your account if any
+            information provided is inaccurate, not current, or incomplete.
+          </p>
+        </div>
+
+        <div class="terms-section">
+          <h2>3. User Responsibilities</h2>
+
+          <h3>3.1 Acceptable Use</h3>
+          <p>You agree not to use our services to:</p>
+          <ul>
+            <li>Violate any applicable law or regulation</li>
+            <li>Infringe upon the intellectual property rights of others</li>
+            <li>Harass, abuse, or harm others</li>
+            <li>Interfere with or disrupt our services or servers</li>
+            <li>Collect or store personal data about other users</li>
+            <li>Engage in fraudulent, deceptive, or misleading practices</li>
+          </ul>
+
+          <h3>3.2 Property Listings</h3>
+          <p>If you list properties on our platform, you agree to:</p>
+          <ul>
+            <li>
+              Provide accurate and complete information about the property
+            </li>
+            <li>Comply with all applicable real estate laws and regulations</li>
+            <li>
+              Not list properties you do not have the right to sell or rent
+            </li>
+            <li>Not engage in discriminatory practices prohibited by law</li>
+          </ul>
+        </div>
+
+        <div class="terms-section">
+          <h2>4. Intellectual Property</h2>
+          <p>
+            All content on our platform, including text, graphics, logos,
+            images, software, and other materials, is owned by Real Estate AI or
+            our licensors and is protected by copyright and other intellectual
+            property laws.
+          </p>
+          <p>
+            We grant you a limited, non-exclusive, non-transferable license to
+            access and use our services for your personal, non-commercial use.
+            You may not:
+          </p>
+          <ul>
+            <li>
+              Reproduce, modify, or create derivative works of our content
+            </li>
+            <li>Distribute, sell, or sublicense our content</li>
+            <li>
+              Use our content for any commercial purpose without our express
+              written consent
+            </li>
+            <li>
+              Reverse engineer or attempt to extract source code from our
+              platform
+            </li>
+          </ul>
+        </div>
+
+        <div class="terms-section">
+          <h2>5. AI-Powered Services</h2>
+          <p>
+            Our platform utilizes artificial intelligence to provide property
+            valuations, recommendations, and market analysis. You acknowledge
+            and agree that:
+          </p>
+          <ul>
+            <li>
+              AI-generated insights are estimates and not professional advice
+            </li>
+            <li>
+              Property valuations and predictions are not guarantees of future
+              value
+            </li>
+            <li>
+              You should consult with qualified professionals before making real
+              estate decisions
+            </li>
+            <li>
+              We are not responsible for decisions made based on AI-generated
+              content
+            </li>
+          </ul>
+          <p>
+            We continuously improve our AI models, and results may change over
+            time.
+          </p>
+        </div>
+
+        <div class="terms-section">
+          <h2>6. Limitation of Liability</h2>
+          <p>
+            To the maximum extent permitted by law, Real Estate AI and its
+            affiliates shall not be liable for any indirect, incidental,
+            special, consequential, or punitive damages, or any loss of profits
+            or revenues, whether incurred directly or indirectly, or any loss of
+            data, use, goodwill, or other intangible losses, resulting from:
+          </p>
+          <ul>
+            <li>
+              Your access to or use of or inability to access or use our
+              services
+            </li>
+            <li>Any conduct or content of any third party on our services</li>
+            <li>Any content obtained from our services</li>
+            <li>
+              Unauthorized access, use, or alteration of your transmissions or
+              content
+            </li>
+          </ul>
+          <p>
+            In no event shall our aggregate liability exceed the greater of one
+            hundred U.S. dollars (U.S. $100.00) or the amount you paid us in the
+            past twelve months.
+          </p>
+        </div>
+
+        <div class="terms-section">
+          <h2>7. Governing Law</h2>
+          <p>
+            These Terms shall be governed by and construed in accordance with
+            the laws of the State of California, without regard to its conflict
+            of law provisions.
+          </p>
+          <p>
+            Any legal suit, action, or proceeding arising out of or related to
+            these Terms or our services shall be instituted exclusively in the
+            federal or state courts located in San Francisco County, California.
+            You waive any objections to venue in such courts.
+          </p>
+        </div>
+
+        <div class="terms-section">
+          <h2>8. Termination</h2>
+          <p>
+            We may terminate or suspend your access to our services immediately,
+            without prior notice or liability, for any reason whatsoever,
+            including without limitation if you breach these Terms.
+          </p>
+          <p>
+            Upon termination, your right to use our services will immediately
+            cease. All provisions of these Terms which by their nature should
+            survive termination shall survive, including ownership provisions,
+            warranty disclaimers, indemnity, and limitations of liability.
+          </p>
+        </div>
+
+        <div class="terms-section">
+          <h2>9. Contact Us</h2>
+          <p>If you have any questions about these Terms, please contact us:</p>
+          <div class="contact-info">
+            <p><i class="fas fa-envelope"></i> Email: legal@realestateai.com</p>
+            <p>
+              <i class="fas fa-map-marker-alt"></i> Address: 123 Innovation
+              Drive, Tech City, CA 94043
+            </p>
+            <p><i class="fas fa-phone"></i> Phone: (555) 987-6543</p>
+          </div>
+        </div>
+
+        <div class="back-link">
+          <a href="index.html"
+            ><i class="fas fa-arrow-left"></i> Back to Home</a
+          >
+        </div>
+      </div>
+
+      <footer>
+        <div class="footer-content">
+          <div class="footer-logo">RealEstate AI</div>
+          <p>Intelligent solutions for modern real estate needs</p>
+
+          <div class="footer-links">
+            <a href="index.html">Home</a>
+            <a href="properties.html">Properties</a>
+            <a href="about.html">About Us</a>
+            <a href="contact.html">Contact</a>
+            <a href="terms.html">Terms</a>
+            <a href="privacy.html">Privacy</a>
+          </div>
+
+          <div class="copyright">
+            &copy; 2025 Real Estate AI. All rights reserved.
+          </div>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

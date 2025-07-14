@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In - Real Estate AI</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      :root {
+        --primary-teal: #0d9488;
+        --secondary-coral: #f87171;
+        --accent-gold: #fef08a;
+        --neutral-bg: #fafafa;
+        --card-bg: #ffffff;
+        --text-dark: #1f2937;
+        --text-light: #6b7280;
+        --border-gray: #e5e7eb;
+        --shadow-light: rgba(0, 0, 0, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Roboto", sans-serif;
+        background-color: var(--neutral-bg);
+        color: var(--text-dark);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        flex: 1;
+      }
+
+      header {
+        background: linear-gradient(135deg, var(--primary-teal), #0891b2);
+        color: #ffffff;
+        padding: 60px 20px;
+        border-radius: 8px;
+        margin-bottom: 40px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+
+      header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
+        background-size: cover;
+        opacity: 0.2;
+      }
+
+      header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        position: relative;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      header p {
+        font-size: 1.2rem;
+        max-width: 700px;
+        margin: 0 auto 30px;
+        position: relative;
+      }
+
+      .form-container {
+        max-width: 500px;
+        margin: 0 auto;
+        background: var(--card-bg);
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px var(--shadow-light);
+        position: relative;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--text-dark);
+      }
+
+      .form-group input {
+        width: 100%;
+        padding: 14px;
+        border: 1px solid var(--border-gray);
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+      }
+
+      .form-group input:focus {
+        border-color: var(--primary-teal);
+        box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+        outline: none;
+      }
+
+      button {
+        width: 100%;
+        padding: 14px;
+        background-color: var(--primary-teal);
+        color: white;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.1rem;
+        margin-top: 10px;
+      }
+
+      button:hover {
+        background-color: #0f766e;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .form-links {
+        text-align: center;
+        margin-top: 25px;
+      }
+
+      .form-links p {
+        margin-bottom: 10px;
+      }
+
+      .form-links a {
+        color: var(--primary-teal);
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+      }
+
+      .form-links a:hover {
+        color: #0f766e;
+        text-decoration: underline;
+      }
+
+      .back-link {
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .back-link a {
+        color: var(--primary-teal);
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .back-link a:hover {
+        text-decoration: underline;
+      }
+
+      footer {
+        background: var(--primary-teal);
+        color: white;
+        padding: 40px 0;
+        margin-top: 80px;
+        border-radius: 8px;
+      }
+
+      .footer-content {
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .footer-logo {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        display: inline-block;
+      }
+
+      .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin: 30px 0;
+        flex-wrap: wrap;
+      }
+
+      .footer-links a {
+        color: white;
+        text-decoration: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .footer-links a:hover {
+        opacity: 0.8;
+      }
+
+      .copyright {
+        margin-top: 20px;
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+
+      @media (max-width: 768px) {
+        header h1 {
+          font-size: 2rem;
+        }
+
+        .form-container {
+          padding: 30px 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Sign In</h1>
+        <p>Access your account to manage properties and preferences</p>
+      </header>
+
+      <div class="form-container">
+        <form id="signinForm" method="POST" action="login.php">
+          <input type="hidden" name="redirect" id="redirect" value="" />
+
+          <div class="form-group">
+            <label for="email">Email:</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              placeholder="Enter your email"
+            />
+          </div>
+          <div class="form-group">
+            <label for="password">Password:</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              placeholder="Enter your password"
+            />
+          </div>
+          <button type="submit">Sign In</button>
+        </form>
+
+        <div class="form-links">
+          <p>
+            Don't have an account? <a href="register.html">Register here</a>
+          </p>
+          <div class="back-link">
+            <a href="index.html"
+              ><i class="fas fa-arrow-left"></i> Back to Home</a
+            >
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="footer-content">
+          <div class="footer-logo">RealEstate AI</div>
+          <p>Intelligent solutions for modern real estate needs</p>
+
+          <div class="footer-links">
+            <a href="index.html">Home</a>
+            <a href="properties.html">Properties</a>
+            <a href="about.html">About Us</a>
+            <a href="contact.html">Contact</a>
+            <a href="terms.html">Terms</a>
+            <a href="privacy.html">Privacy</a>
+          </div>
+
+          <div class="copyright">
+            &copy; 2025 Real Estate AI. All rights reserved.
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectParam = urlParams.get("redirect");
+
+        if (redirectParam) {
+          document.getElementById("redirect").value = redirectParam;
+        }
+      });
+      // Wait until the page is fully loaded before running the code
+      document.addEventListener("DOMContentLoaded", function () {
+        // Get the sign-in form element
+        const signinForm = document.getElementById("signinForm");
+
+        // Add submit event listener to the form
+        signinForm.addEventListener("submit", function (event) {
+          // Prevent the form from submitting normally
+          event.preventDefault();
+
+          // Get the redirect URL from hidden input field
+          const redirectUrl = document.getElementById("redirect").value;
+
+          // Send form data to server using Fetch API
+          fetch("login.php", {
+            method: "POST",
+            body: new FormData(signinForm), // Automatically collects all form data
+            credentials: "same-origin", // Ensures cookies/session are sent
+          })
+            .then((response) => {
+              // Check if server response is OK (status 200-299)
+              if (!response.ok) {
+                throw new Error("Network response was not ok");
+              }
+              return response.json(); // Parse JSON response
+            })
+            .then((data) => {
+              if (data.status === "success") {
+                // Handle redirect based on user role
+                if (data.role === "buyer") {
+                  // Use redirect URL if available, otherwise go to buyer dashboard
+                  window.location.href = data.redirect || "buyer_dashboard.php";
+                } else if (data.role === "seller") {
+                  window.location.href = "seller_dashboard.php";
+                } else if (data.role === "admin") {
+                  window.location.href = "admin_dashboard.php";
+                } else if (data.role === "agent") {
+                  window.location.href = "agent_dashboard.php";
+                } else {
+                  // Default redirect for unknown roles
+                  window.location.href = "dashboard.php";
+                }
+              } else {
+                // Show error message to user
+                alert("Login failed: " + data.message);
+              }
+            })
+            .catch((error) => {
+              // Handle errors
+              console.error("Error during login:", error);
+              alert("An error occurred. Please try again.");
+            });
+        });
+      });
+    </script>
+  </body>
+</html>

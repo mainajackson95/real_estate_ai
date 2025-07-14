@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About Us - Real Estate AI</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      :root {
+        --primary-teal: #0d9488;
+        --secondary-coral: #f87171;
+        --accent-gold: #fef08a;
+        --neutral-bg: #fafafa;
+        --card-bg: #ffffff;
+        --text-dark: #1f2937;
+        --text-light: #6b7280;
+        --border-gray: #e5e7eb;
+        --shadow-light: rgba(0, 0, 0, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Roboto", sans-serif;
+        background-color: var(--neutral-bg);
+        color: var(--text-dark);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        flex: 1;
+      }
+
+      header {
+        background: linear-gradient(135deg, var(--primary-teal), #0891b2);
+        color: #ffffff;
+        padding: 60px 20px;
+        border-radius: 8px;
+        margin-bottom: 40px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+
+      header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
+        background-size: cover;
+        opacity: 0.2;
+      }
+
+      header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 15px;
+        position: relative;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      header p {
+        font-size: 1.2rem;
+        max-width: 700px;
+        margin: 0 auto 30px;
+        position: relative;
+      }
+
+      /* About sections */
+      .about-section {
+        margin-bottom: 60px;
+      }
+
+      .section-title {
+        font-size: 2rem;
+        color: var(--primary-teal);
+        margin-bottom: 30px;
+        text-align: center;
+        position: relative;
+        display: inline-block;
+        width: 100%;
+      }
+
+      .section-title::after {
+        content: "";
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 4px;
+        background: var(--accent-gold);
+        border-radius: 2px;
+      }
+
+      .section-subtitle {
+        font-size: 1.2rem;
+        color: var(--text-light);
+        text-align: center;
+        max-width: 800px;
+        margin: 0 auto 40px;
+      }
+
+      .content-card {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 5px 20px var(--shadow-light);
+        margin-bottom: 30px;
+        transition: all 0.3s ease;
+      }
+
+      .content-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      }
+
+      /* Our Story Section */
+      .story-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        align-items: center;
+      }
+
+      @media (max-width: 768px) {
+        .story-container {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .story-image {
+        border-radius: 10px;
+        overflow: hidden;
+        height: 350px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .story-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .story-content h3 {
+        font-size: 1.8rem;
+        color: var(--primary-teal);
+        margin-bottom: 20px;
+      }
+
+      .story-content p {
+        margin-bottom: 20px;
+        line-height: 1.8;
+      }
+
+      /* Mission & Vision */
+      .mission-vision {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+      }
+
+      @media (max-width: 768px) {
+        .mission-vision {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .mission-card,
+      .vision-card {
+        padding: 30px;
+        border-radius: 15px;
+        background: var(--card-bg);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        transition: all 0.3s ease;
+      }
+
+      .mission-card:hover,
+      .vision-card:hover {
+        transform: translateY(-5px);
+      }
+
+      .mission-card {
+        border-top: 4px solid var(--primary-teal);
+      }
+
+      .vision-card {
+        border-top: 4px solid var(--secondary-coral);
+      }
+
+      .mission-icon,
+      .vision-icon {
+        width: 70px;
+        height: 70px;
+        background: rgba(13, 148, 136, 0.1);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        font-size: 1.8rem;
+        color: var(--primary-teal);
+      }
+
+      .vision-icon {
+        background: rgba(248, 113, 113, 0.1);
+        color: var(--secondary-coral);
+      }
+
+      .mission-card h3,
+      .vision-card h3 {
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+        color: var(--text-dark);
+      }
+
+      /* Team Section */
+      .team-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 30px;
+      }
+
+      .team-member {
+        background: var(--card-bg);
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+      }
+
+      .team-member:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+      }
+
+      .member-image {
+        height: 250px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      .member-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.5s ease;
+      }
+
+      .team-member:hover .member-image img {
+        transform: scale(1.1);
+      }
+
+      .member-info {
+        padding: 20px;
+        text-align: center;
+      }
+
+      .member-info h3 {
+        font-size: 1.4rem;
+        margin-bottom: 5px;
+        color: var(--primary-teal);
+      }
+
+      .member-position {
+        color: var(--secondary-coral);
+        font-weight: 600;
+        margin-bottom: 15px;
+      }
+
+      .member-bio {
+        color: var(--text-light);
+        font-size: 0.95rem;
+        margin-bottom: 15px;
+      }
+
+      .social-links {
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+      }
+
+      .social-links a {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background: var(--neutral-bg);
+        color: var(--primary-teal);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+      }
+
+      .social-links a:hover {
+        background: var(--primary-teal);
+        color: white;
+        transform: translateY(-3px);
+      }
+
+      /* Stats Section */
+      .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        text-align: center;
+      }
+
+      .stat-card {
+        padding: 25px;
+        background: var(--card-bg);
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+      }
+
+      .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary-teal);
+        margin-bottom: 10px;
+      }
+
+      .stat-label {
+        color: var(--text-light);
+        font-size: 1.1rem;
+      }
+
+      /* Testimonials */
+      .testimonial-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 30px;
+      }
+
+      .testimonial-card {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        position: relative;
+      }
+
+      .testimonial-card::before {
+        content: "";
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 5rem;
+        color: rgba(13, 148, 136, 0.1);
+        font-family: Georgia, serif;
+        line-height: 1;
+      }
+
+      .testimonial-text {
+        font-style: italic;
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .testimonial-author {
+        display: flex;
+        align-items: center;
+      }
+
+      .author-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        margin-right: 15px;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .author-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .author-info h4 {
+        font-size: 1.1rem;
+        margin-bottom: 5px;
+      }
+
+      .author-role {
+        color: var(--text-light);
+        font-size: 0.9rem;
+      }
+
+      /* CTA Section */
+      .cta-section {
+        background: linear-gradient(135deg, var(--primary-teal), #0891b2);
+        color: white;
+        padding: 60px 30px;
+        border-radius: 15px;
+        text-align: center;
+        margin: 40px 0;
+      }
+
+      .cta-section h2 {
+        font-size: 2.2rem;
+        margin-bottom: 20px;
+      }
+
+      .cta-section p {
+        max-width: 700px;
+        margin: 0 auto 30px;
+        font-size: 1.1rem;
+      }
+
+      .cta-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .cta-button {
+        padding: 12px 30px;
+        background-color: white;
+        color: var(--primary-teal);
+        text-decoration: none;
+        border-radius: 30px;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .cta-button:hover {
+        background-color: var(--accent-gold);
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+      }
+
+      .cta-button.secondary {
+        background-color: transparent;
+        color: white;
+        border: 2px solid white;
+      }
+
+      .cta-button.secondary:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+
+      /* Footer */
+      footer {
+        background: var(--primary-teal);
+        color: white;
+        padding: 40px 0;
+        margin-top: 80px;
+        border-radius: 8px;
+      }
+
+      .footer-content {
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .footer-logo {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 20px;
+        display: inline-block;
+      }
+
+      .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+        margin: 30px 0;
+        flex-wrap: wrap;
+      }
+
+      .footer-links a {
+        color: white;
+        text-decoration: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .footer-links a:hover {
+        opacity: 0.8;
+      }
+
+      .copyright {
+        margin-top: 20px;
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
+
+      .back-link {
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .back-link a {
+        color: var(--primary-teal);
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 12px 25px;
+        background-color: white;
+        border-radius: 30px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      .back-link a:hover {
+        background-color: var(--accent-gold);
+        text-decoration: none;
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+      }
+
+      @media (max-width: 768px) {
+        header h1 {
+          font-size: 2rem;
+        }
+
+        .section-title {
+          font-size: 1.8rem;
+        }
+
+        .story-container,
+        .mission-vision {
+          grid-template-columns: 1fr;
+        }
+
+        .cta-buttons {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>About Real Estate AI</h1>
+        <p>Transforming real estate with intelligent technology solutions</p>
+      </header>
+
+      <!-- Our Story Section -->
+      <section class="about-section">
+        <h2 class="section-title">Our Story</h2>
+        <p class="section-subtitle">
+          How we're revolutionizing the real estate industry with AI technology
+        </p>
+
+        <div class="content-card">
+          <div class="story-container">
+            <div class="story-image">
+              <img
+                src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=1470&auto=format&fit=crop"
+                alt="Modern office building"
+              />
+            </div>
+            <div class="story-content">
+              <h3>Pioneering the Future of Real Estate</h3>
+              <p>
+                Founded in 2020, Real Estate AI began with a simple vision: to
+                harness the power of artificial intelligence to simplify and
+                enhance the property experience for everyone. Our team of real
+                estate experts, data scientists, and technology innovators came
+                together to create a platform that transforms how people buy,
+                sell, and invest in property.
+              </p>
+              <p>
+                What started as a small startup in San Francisco has grown into
+                a leading real estate technology company serving clients across
+                the United States. Our proprietary AI algorithms analyze
+                millions of data points to provide accurate valuations,
+                predictive market trends, and personalized property
+                recommendations.
+              </p>
+              <p>
+                Today, we're proud to serve thousands of clients and partners,
+                helping them make smarter real estate decisions with confidence.
+                Our journey continues as we develop new technologies to make
+                real estate transactions more transparent, efficient, and
+                accessible to everyone.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Mission & Vision Section -->
+      <section class="about-section">
+        <h2 class="section-title">Our Mission & Vision</h2>
+        <p class="section-subtitle">
+          Driving innovation in the real estate industry
+        </p>
+
+        <div class="mission-vision">
+          <div class="mission-card">
+            <div class="mission-icon">
+              <i class="fas fa-bullseye"></i>
+            </div>
+            <h3>Our Mission</h3>
+            <p>
+              To empower individuals and businesses with intelligent real estate
+              solutions that simplify complex decisions, provide unparalleled
+              market insights, and create exceptional value through cutting-edge
+              AI technology.
+            </p>
+            <div class="story-image" style="height: 200px; margin-top: 20px">
+              <img
+                src="https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1374&auto=format&fit=crop"
+                alt="AI technology in real estate"
+              />
+            </div>
+          </div>
+
+          <div class="vision-card">
+            <div class="vision-icon">
+              <i class="fas fa-eye"></i>
+            </div>
+            <h3>Our Vision</h3>
+            <p>
+              To become the global leader in AI-powered real estate services,
+              transforming how people discover, evaluate, and transact property
+              through innovative technology that makes real estate accessible,
+              transparent, and rewarding for everyone.
+            </p>
+            <div class="story-image" style="height: 200px; margin-top: 20px">
+              <img
+                src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1364&auto=format&fit=crop"
+                alt="Global real estate vision"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Team Section -->
+      <section class="about-section">
+        <h2 class="section-title">Meet Our Team</h2>
+        <p class="section-subtitle">
+          The talented individuals driving our success
+        </p>
+
+        <div class="team-grid">
+          <div class="team-member">
+            <div class="member-image">
+              <img
+                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1374&auto=format&fit=crop"
+                alt="Alex Johnson"
+              />
+            </div>
+            <div class="member-info">
+              <h3>Alex Johnson</h3>
+              <div class="member-position">CEO & Founder</div>
+              <p class="member-bio">
+                20+ years in real estate technology, former Google AI researcher
+              </p>
+              <div class="social-links">
+                <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fas fa-envelope"></i></a>
+              </div>
+            </div>
+          </div>
+
+          <div class="team-member">
+            <div class="member-image">
+              <img
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1364&auto=format&fit=crop"
+                alt="Sarah Chen"
+              />
+            </div>
+            <div class="member-info">
+              <h3>Sarah Chen</h3>
+              <div class="member-position">Chief Technology Officer</div>
+              <p class="member-bio">
+                AI specialist with background at MIT and leading tech firms
+              </p>
+              <div class="social-links">
+                <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                <a href="#"><i class="fab fa-github"></i></a>
+                <a href="#"><i class="fas fa-envelope"></i></a>
+              </div>
+            </div>
+          </div>
+
+          <div class="team-member">
+            <div class="member-image">
+              <img
+                src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=1374&auto=format&fit=crop"
+                alt="Michael Rodriguez"
+              />
+            </div>
+            <div class="member-info">
+              <h3>Michael Rodriguez</h3>
+              <div class="member-position">Head of Real Estate Operations</div>
+              <p class="member-bio">
+                Former executive at national real estate brokerage with 15+
+                years experience
+              </p>
+              <div class="social-links">
+                <a href="#"><i class="fab fa-linkedin-in"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+                <a href="#"><i class="fas fa-envelope"></i></a>
+              </div>
+            </div>
+          </div>
+
+          <div class="team-member">
+            <div class="member-image">
+              <img
+                src="https://images.unsplash.com/photo-1614289371518-722f2615943d?q=80&w=1370&auto=format&fit=crop"
+                alt="Jennifer Kim"
+              />
+            </div>
+            <div class="member-info">
+              <h3>Jennifer Kim</h3>
+              <div c

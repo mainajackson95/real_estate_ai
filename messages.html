@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Messages - Real Estate AI</title>
+    <style>
+      .messages-container {
+        display: flex;
+        height: 80vh;
+      }
+      .conversation-list {
+        width: 30%;
+        border-right: 1px solid var(--border-gray);
+        overflow-y: auto;
+      }
+      .conversation {
+        padding: 15px;
+        border-bottom: 1px solid var(--border-gray);
+        cursor: pointer;
+      }
+      .conversation.active {
+        background-color: #f0fdf4;
+      }
+      .message-area {
+        width: 70%;
+        display: flex;
+        flex-direction: column;
+      }
+      .message-header {
+        padding: 15px;
+        border-bottom: 1px solid var(--border-gray);
+      }
+      .message-history {
+        flex-grow: 1;
+        padding: 15px;
+        overflow-y: auto;
+      }
+      .message-input {
+        padding: 15px;
+        display: flex;
+        gap: 10px;
+      }
+      .message-input textarea {
+        flex-grow: 1;
+        padding: 10px;
+        border: 1px solid var(--border-gray);
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sidebar">
+      <!-- Existing sidebar content -->
+    </div>
+
+    <div class="content">
+      <header>Messages</header>
+
+      <div class="card">
+        <div class="messages-container">
+          <div class="conversation-list" id="conversation-list">
+            <!-- Conversations will be loaded here -->
+          </div>
+
+          <div class="message-area">
+            <div class="message-header" id="message-header">
+              Select a conversation
+            </div>
+
+            <div class="message-history" id="message-history">
+              <!-- Messages will be displayed here -->
+            </div>
+
+            <div class="message-input">
+              <textarea
+                id="message-text"
+                placeholder="Type your message..."
+              ></textarea>
+              <button id="send-message">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Messaging functionality
+      function loadConversations() {
+        fetch("get_conversations.php")
+          .then((response) => response.json())
+          .then((data) => {
+            let conversationsHtml = "";
+            data.forEach((conversation) => {
+              conversationsHtml += `
+                            <div class="conversation" data-id="${conversation.id}">
+                                <strong>${conversation.participant_name}</strong>
+                                <p>${conversation.last_message}</p>
+                                <small>${conversation.last_active}</small>
+                            </div>
+                        `;
+            });
+            document.getElementById("conversation-list").innerHTML =
+              conversationsHtml;
+
+            // Add click handlers
+            document.querySelectorAll(".conversation").forEach((conv) => {
+              conv.addEventListener("click", function () {
+                loadMessages(this.dataset.id);
+              });
+            });
+          });
+      }
+
+      function loadMessages(conversationId) {
+        fetch(`get_messages.php?conversation_id=${conversationId}`)
+          .then((response) => response.json())
+          .then((data) => {
+            let messagesHtml = "";
+            data.forEach((message) => {
+              messagesHtml += `
+                            <div class="message ${
+                              message.sender_id == currentUserId
+                                ? "sent"
+                                : "received"
+                            }">
+                                <p>${message.content}</p>
+                                <small>${message.sent_at}</small>
+                            </div>
+                        `;
+            });
+            document.getElementById("message-history").innerHTML = messagesHtml;
+          });
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        loadConversations();
+
+        document
+          .getElementById("send-message")
+          .addEventListener("click", function () {
+            const message = document.getElementById("message-text").value;
+            // Send message via AJAX
+          });
+      });
+    </script>
+  </body>
+</html>
