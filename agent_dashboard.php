@@ -669,6 +669,202 @@ $conn->close();
       margin-right: 8px;
     }
 
+    /* Transactions Section Styles */
+    #transactions-section {
+      margin-top: 40px;
+    }
+
+    .transaction-filters {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .filter-group label {
+      font-weight: 500;
+      color: var(--text-light);
+    }
+
+    .filter-group select {
+      padding: 8px 12px;
+      border: 1px solid var(--border-gray);
+      border-radius: 6px;
+      background: white;
+    }
+
+    .transactions-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+
+    .summary-card {
+      background: var(--card-bg);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .summary-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 15px;
+      font-size: 1.5rem;
+      background: rgba(13, 148, 136, 0.1);
+      color: var(--primary-teal);
+    }
+
+    .summary-info h3 {
+      font-size: 1.8rem;
+      margin-bottom: 5px;
+      color: var(--text-dark);
+    }
+
+    .summary-info p {
+      color: var(--text-light);
+      font-size: 0.95rem;
+    }
+
+    .transactions-table {
+      background: var(--card-bg);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .transactions-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .transactions-table th,
+    .transactions-table td {
+      padding: 15px 20px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-gray);
+    }
+
+    .transactions-table th {
+      background-color: #f9fafb;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+
+    .transactions-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .transactions-table tbody tr:hover {
+      background-color: rgba(13, 148, 136, 0.03);
+    }
+
+    .property-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .property-thumb {
+      width: 50px;
+      height: 50px;
+      border-radius: 6px;
+      background-size: cover;
+      background-position: center;
+      background-color: #f1f5f9;
+    }
+
+    .property-info h4 {
+      margin: 0 0 5px;
+      font-size: 1rem;
+    }
+
+    .property-info p {
+      margin: 0;
+      color: var(--primary-teal);
+      font-weight: 600;
+    }
+
+    .status-badge {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .status-completed {
+      background: rgba(52, 211, 153, 0.1);
+      color: var(--success-green);
+    }
+
+    .status-pending {
+      background: rgba(254, 240, 138, 0.25);
+      color: #d97706;
+    }
+
+    .status-cancelled {
+      background: rgba(248, 113, 113, 0.1);
+      color: var(--secondary-coral);
+    }
+
+    .transactions-table .btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 5px;
+    }
+
+    .view-details-btn {
+      background: rgba(13, 148, 136, 0.1);
+      color: var(--primary-teal);
+    }
+
+    .download-btn {
+      background: rgba(167, 139, 250, 0.1);
+      color: var(--purple);
+    }
+
+    /* Responsive styles for table */
+    @media (max-width: 768px) {
+      .transactions-table {
+        overflow-x: auto;
+      }
+
+      .transactions-table table {
+        min-width: 700px;
+      }
+
+      .transaction-filters {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .filter-group {
+        width: 100%;
+      }
+
+      .filter-group select {
+        flex-grow: 1;
+      }
+    }
+
     /* Main Content Styles */
     .content {
       flex-grow: 1;
@@ -1973,6 +2169,169 @@ $conn->close();
             <i class="fas fa-user-friends"></i>
             <p>Select a client to view details</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-section" id="transactions-section">
+      <div class="section-header">
+        <h2>Transaction Records</h2>
+        <div class="transaction-filters">
+          <div class="filter-group">
+            <label for="transaction-status"><i class="fas fa-filter"></i> Status:</label>
+            <select id="transaction-status">
+              <option value="all">All Transactions</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="transaction-date"><i class="fas fa-calendar"></i> Date:</label>
+            <select id="transaction-date">
+              <option value="all">All Dates</option>
+              <option value="week">Past Week</option>
+              <option value="month">Past Month</option>
+              <option value="quarter">Past Quarter</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <button class="btn btn-primary"><i class="fas fa-plus"></i> New Transaction</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="transactions-container">
+        <div class="transactions-summary">
+          <div class="summary-card">
+            <div class="summary-icon">
+              <i class="fas fa-handshake"></i>
+            </div>
+            <div class="summary-info">
+              <h3>12</h3>
+              <p>Total Transactions</p>
+            </div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-icon">
+              <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="summary-info">
+              <h3>8</h3>
+              <p>Completed</p>
+            </div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-icon">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="summary-info">
+              <h3>3</h3>
+              <p>Pending</p>
+            </div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-icon">
+              <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="summary-info">
+              <h3>$127,500</h3>
+              <p>Total Commission</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="transactions-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Property</th>
+                <th>Client</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Commission</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="property-info">
+                    <div class="property-thumb" style="background-image: url('placeholder.jpg');"></div>
+                    <div>
+                      <h4>123 Main St</h4>
+                      <p>$425,000</p>
+                    </div>
+                  </div>
+                </td>
+                <td>John Smith</td>
+                <td>Jul 10, 2025</td>
+                <td><span class="status-badge status-completed">Completed</span></td>
+                <td>$12,750</td>
+                <td>
+                  <button class="btn view-details-btn"><i class="fas fa-eye"></i></button>
+                  <button class="btn download-btn"><i class="fas fa-download"></i></button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="property-info">
+                    <div class="property-thumb" style="background-image: url('placeholder.jpg');"></div>
+                    <div>
+                      <h4>456 Park Ave</h4>
+                      <p>$650,000</p>
+                    </div>
+                  </div>
+                </td>
+                <td>Jane Doe</td>
+                <td>Jul 5, 2025</td>
+                <td><span class="status-badge status-completed">Completed</span></td>
+                <td>$19,500</td>
+                <td>
+                  <button class="btn view-details-btn"><i class="fas fa-eye"></i></button>
+                  <button class="btn download-btn"><i class="fas fa-download"></i></button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="property-info">
+                    <div class="property-thumb" style="background-image: url('placeholder.jpg');"></div>
+                    <div>
+                      <h4>789 Oak St</h4>
+                      <p>$325,000</p>
+                    </div>
+                  </div>
+                </td>
+                <td>Michael Johnson</td>
+                <td>Jun 28, 2025</td>
+                <td><span class="status-badge status-pending">Pending</span></td>
+                <td>$9,750</td>
+                <td>
+                  <button class="btn view-details-btn"><i class="fas fa-eye"></i></button>
+                  <button class="btn download-btn"><i class="fas fa-download"></i></button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="property-info">
+                    <div class="property-thumb" style="background-image: url('placeholder.jpg');"></div>
+                    <div>
+                      <h4>101 Pine Rd</h4>
+                      <p>$550,000</p>
+                    </div>
+                  </div>
+                </td>
+                <td>Sarah Davis</td>
+                <td>Jun 20, 2025</td>
+                <td><span class="status-badge status-completed">Completed</span></td>
+                <td>$16,500</td>
+                <td>
+                  <button class="btn view-details-btn"><i class="fas fa-eye"></i></button>
+                  <button class="btn download-btn"><i class="fas fa-download"></i></button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
