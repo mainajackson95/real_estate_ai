@@ -11,6 +11,14 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
+$user_sql = "SELECT * FROM users WHERE id = ?";
+$stmt = $conn->prepare($user_sql);
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$user_result = $stmt->get_result();
+$user = $user_result->fetch_assoc();
+$stmt->close();
+
 // Fetch saved properties
 $saved_sql = "SELECT p.*, 
               (SELECT image_path FROM property_images WHERE property_id = p.id LIMIT 1) AS image_path
