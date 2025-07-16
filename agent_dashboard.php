@@ -616,6 +616,10 @@ $conn->close();
       border-radius: 20px;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     .nav-links {
       flex-grow: 1;
     }
@@ -745,6 +749,143 @@ $conn->close();
     .stat-icon.rating {
       background: rgba(52, 211, 153, 0.15);
       color: var(--success-green);
+    }
+
+    /* Clients Section Styles */
+    .clients-container {
+      display: flex;
+      gap: 25px;
+    }
+
+    .client-list {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .client-card {
+      background: var(--card-bg);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .client-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .client-avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, var(--purple), var(--primary-teal));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 1.2rem;
+      margin-right: 20px;
+    }
+
+    .client-info {
+      flex: 1;
+    }
+
+    .client-info h3 {
+      margin-bottom: 8px;
+      color: var(--text-dark);
+    }
+
+    .client-phone,
+    .client-email {
+      margin: 4px 0;
+      color: var(--text-light);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .client-properties {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .property-tag {
+      background: rgba(13, 148, 136, 0.1);
+      color: var(--primary-teal);
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .client-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .client-actions .btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .message-btn {
+      background: rgba(96, 165, 250, 0.1);
+      color: var(--info-blue);
+    }
+
+    .schedule-btn {
+      background: rgba(52, 211, 153, 0.1);
+      color: var(--success-green);
+    }
+
+    .client-details {
+      width: 300px;
+      background: var(--card-bg);
+      border-radius: 10px;
+      padding: 25px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .detail-placeholder {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: var(--text-light);
+    }
+
+    .detail-placeholder i {
+      font-size: 3rem;
+      margin-bottom: 15px;
+      opacity: 0.3;
+    }
+
+    /* Responsive styles */
+    @media (max-width: 992px) {
+      .clients-container {
+        flex-direction: column;
+      }
+
+      .client-details {
+        width: 100%;
+      }
     }
 
     .stat-info h3 {
@@ -1579,7 +1720,7 @@ $conn->close();
 <body>
   <!-- Sidebar -->
   <div class="sidebar">
-    <div class="brand">
+    <div class="brand" id="dashboard-logo">
       <i class="fas fa-home"></i>
       <h1>RealEstate AI</h1>
     </div>
@@ -1593,11 +1734,11 @@ $conn->close();
     </div>
 
     <div class="nav-links">
-      <a href="#" class="active">
+      <a href="#dashboard-header" class="active">
         <i class="fas fa-chart-line"></i>
         <span>Dashboard</span>
       </a>
-      <a href="#">
+      <a href="#listings-section">
         <i class="fas fa-home"></i>
         <span>Listings</span>
       </a>
@@ -1627,7 +1768,7 @@ $conn->close();
 
   <!-- Main Content -->
   <div class="content">
-    <div class="dashboard-header">
+    <div class="dashboard-header" id="dashboard-header">
       <h1>Agent Dashboard</h1>
       <div class="date-display">
         <i class="far fa-calendar"></i>
@@ -1701,7 +1842,7 @@ $conn->close();
     </div>
 
     <!-- Listings Section -->
-    <div class="dashboard-section">
+    <div class="dashboard-section" id="listings-section">
       <div class="section-header">
         <h2>Recent Listings</h2>
         <a href="#" class="view-all">View All</a>
@@ -1716,10 +1857,10 @@ $conn->close();
     </div>
 
     <!-- Calendar Section -->
-    <div class="dashboard-section">
+    <div class="dashboard-section" id="calendar-section">
       <div class="section-header">
         <h2>Upcoming Schedule</h2>
-        <a href="#" class="view-all">View Calendar</a>
+        <a href="#calender-section" class="view-all">View Calendar</a>
       </div>
 
       <div class="calendar-container">
@@ -1737,6 +1878,101 @@ $conn->close();
 
         <div class="calendar-grid" id="calendar-grid">
           <!-- Calendar will be populated dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-section" id="clients-section">
+      <div class="section-header">
+        <h2>Active Clients</h2>
+        <a href="#" class="view-all">View All</a>
+      </div>
+
+      <div class="clients-container">
+        <div class="client-list">
+          <div class="client-card">
+            <div class="client-avatar">
+              <span>JS</span>
+            </div>
+            <div class="client-info">
+              <h3>John Smith</h3>
+              <p class="client-phone"><i class="fas fa-phone"></i> (555) 123-4567</p>
+              <p class="client-email"><i class="fas fa-envelope"></i> john.smith@example.com</p>
+              <div class="client-properties">
+                <span class="property-tag">Looking: 3-4 BD Homes</span>
+                <span class="property-tag">Budget: $400-600K</span>
+              </div>
+            </div>
+            <div class="client-actions">
+              <button class="btn message-btn"><i class="fas fa-comment"></i></button>
+              <button class="btn schedule-btn"><i class="fas fa-calendar"></i></button>
+            </div>
+          </div>
+
+          <div class="client-card">
+            <div class="client-avatar">
+              <span>JD</span>
+            </div>
+            <div class="client-info">
+              <h3>Jane Doe</h3>
+              <p class="client-phone"><i class="fas fa-phone"></i> (555) 987-6543</p>
+              <p class="client-email"><i class="fas fa-envelope"></i> jane.doe@example.com</p>
+              <div class="client-properties">
+                <span class="property-tag">Looking: Luxury Condos</span>
+                <span class="property-tag">Budget: $800K-1.2M</span>
+              </div>
+            </div>
+            <div class="client-actions">
+              <button class="btn message-btn"><i class="fas fa-comment"></i></button>
+              <button class="btn schedule-btn"><i class="fas fa-calendar"></i></button>
+            </div>
+          </div>
+
+          <div class="client-card">
+            <div class="client-avatar">
+              <span>MJ</span>
+            </div>
+            <div class="client-info">
+              <h3>Michael Johnson</h3>
+              <p class="client-phone"><i class="fas fa-phone"></i> (555) 456-7890</p>
+              <p class="client-email"><i class="fas fa-envelope"></i> mj@business.com</p>
+              <div class="client-properties">
+                <span class="property-tag">Looking: Commercial Space</span>
+                <span class="property-tag">Budget: $2-3M</span>
+              </div>
+            </div>
+            <div class="client-actions">
+              <button class="btn message-btn"><i class="fas fa-comment"></i></button>
+              <button class="btn schedule-btn"><i class="fas fa-calendar"></i></button>
+            </div>
+          </div>
+
+          <div class="client-card">
+            <div class="client-avatar">
+              <span>SD</span>
+            </div>
+            <div class="client-info">
+              <h3>Sarah Davis</h3>
+              <p class="client-phone"><i class="fas fa-phone"></i> (555) 234-5678</p>
+              <p class="client-email"><i class="fas fa-envelope"></i> sarahd@example.org</p>
+              <div class="client-properties">
+                <span class="property-tag">Looking: Vacation Homes</span>
+                <span class="property-tag">Budget: $300-500K</span>
+              </div>
+            </div>
+            <div class="client-actions">
+              <button class="btn message-btn"><i class="fas fa-comment"></i></button>
+              <button class="btn schedule-btn"><i class="fas fa-calendar"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="client-details">
+          <h3>Client Details</h3>
+          <div class="detail-placeholder">
+            <i class="fas fa-user-friends"></i>
+            <p>Select a client to view details</p>
+          </div>
         </div>
       </div>
     </div>
@@ -2863,6 +3099,7 @@ Beautiful 3-bedroom home in prime location. Open house this weekend!</textarea>
     async function initDashboard() {
       setCurrentDate();
       renderCalendar();
+      addSmoothScrolling();
 
       try {
         // Load metrics
@@ -2881,6 +3118,33 @@ Beautiful 3-bedroom home in prime location. Open house this weekend!</textarea>
       }
 
       addEventListeners();
+    }
+
+    function addSmoothScrolling() {
+      document.querySelectorAll('.nav-links a').forEach(link => {
+        link.addEventListener('click', function (e) {
+          // Prevent default anchor behavior
+          e.preventDefault();
+
+          // Get target element
+          const targetId = this.getAttribute('href');
+          const targetElement = document.querySelector(targetId);
+
+          if (targetElement) {
+            // Scroll to target
+            targetElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+
+            // Update active class
+            document.querySelectorAll('.nav-links a').forEach(a => {
+              a.classList.remove('active');
+            });
+            this.classList.add('active');
+          }
+        });
+      });
     }
 
     // AI Assistant responses
