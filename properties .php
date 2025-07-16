@@ -11,7 +11,7 @@ error_reporting(E_ALL);
 
 $servername = "localhost";
 $username = "root";
-$password = "";
+$password = "kaisec@2025";
 $dbname = "real_estate_ai_db"; // Ensure this matches your database name
 
 // Create connection
@@ -25,7 +25,7 @@ if ($conn->connect_error) {
 // =============================================
 // SEARCH & FILTER PARAMETERS
 // =============================================
-$searchTerm = isset($_GET['search']) ? trim($_GET['search']) : '';
+$searchTerm = isset($_GET['q']) ? trim($_GET['q']) : (isset($_GET['search']) ? trim($_GET['search']) : '');
 $propertyType = isset($_GET['type']) ? $_GET['type'] : '';
 $priceRange = isset($_GET['price']) ? $_GET['price'] : '';
 $bedrooms = isset($_GET['beds']) ? $_GET['beds'] : '';
