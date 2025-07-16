@@ -1791,7 +1791,7 @@ $conn->close();
           <!-- Address Fields -->
           <div class="form-group">
             <label for="listingStreet"><i class="fas fa-map-marker-alt"></i> Street Address*</label>
-            <input type="text" id="listingStreet" name="street" class="form-control" required
+            <input type="text" id="listingStreet" name="street_address" class="form-control" required
               placeholder="123 Main St" />
           </div>
 
@@ -1925,7 +1925,7 @@ $conn->close();
           <!-- Address Fields -->
           <div class="form-group">
             <label for="editListingStreet"><i class="fas fa-map-marker-alt"></i> Street Address*</label>
-            <input type="text" id="editListingStreet" name="street" class="form-control" required
+            <input type="text" id="editListingStreet" name="street_address" class="form-control" required
               placeholder="123 Main St" />
           </div>
 
