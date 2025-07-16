@@ -1,135 +1,222 @@
 <?php
-session_start();
-require_once 'db_connection.php';
+// =============================================
+// CONFIGURATION & DATABASE CONNECTION
+// =============================================
+session_start(); // Start session if not already started, often useful for user roles/authentication
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    $redirect = urlencode($_SERVER['REQUEST_URI']);
-    header("Location: signin.html?redirect=$redirect");
-    exit;
+// Enable error reporting for debugging - REMOVE IN PRODUCTION
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+$servername = "localhost";
+$username = "root";
+$password = "kaisec@2025";
+$dbname = "real_estate_ai_db"; // Ensure this matches your database name
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
 }
 
-$user_id = $_SESSION['user_id'];
+// =============================================
+// SEARCH & FILTER PARAMETERS
+// =============================================
+$searchTerm = isset($_GET['q']) ? trim($_GET['q']) : (isset($_GET['search']) ? trim($_GET['search']) : '');
+$propertyType = isset($_GET['type']) ? $_GET['type'] : '';
+$priceRange = isset($_GET['price']) ? $_GET['price'] : '';
+$bedrooms = isset($_GET['beds']) ? $_GET['beds'] : '';
+$bathrooms = isset($_GET['baths']) ? $_GET['baths'] : '';
+$squareFeet = isset($_GET['sqft']) ? $_GET['sqft'] : '';
+$sortBy = isset($_GET['sort']) ? $_GET['sort'] : 'newest';
 
-// Fetch user details
-$stmt = $conn->prepare("SELECT username, email, profile_pic, role FROM users WHERE id = ?");
-$stmt->bind_param("i", $user_id);
+// =============================================
+// PAGINATION SETUP
+// =============================================
+$perPage = 9; // Properties per page
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1; // Current page, default to 1
+$offset = ($page - 1) * $perPage;
+
+// =============================================
+// BUILD SQL CONDITIONS
+// =============================================
+$conditions = ["p.status = 'available'"];
+$params = [];
+$types = '';
+
+// Search term condition
+if (!empty($searchTerm)) {
+    $conditions[] = "(p.title LIKE ? OR p.description LIKE ? OR p.address LIKE ? OR p.city LIKE ? OR p.state LIKE ?)";
+    $searchParam = "%{$searchTerm}%";
+    $params = array_merge($params, [$searchParam, $searchParam, $searchParam, $searchParam, $searchParam]);
+    $types .= 'sssss';
+}
+
+// Property type filter
+if (!empty($propertyType)) {
+    $conditions[] = "p.property_type = ?";
+    $params[] = $propertyType;
+    $types .= 's';
+}
+
+// Price range filter
+if (!empty($priceRange)) {
+    $priceParts = explode('-', $priceRange);
+    if (count($priceParts) === 2) {
+        $minPrice = floatval($priceParts[0]);
+        $maxPrice = floatval($priceParts[1]);
+        $conditions[] = "p.price BETWEEN ? AND ?";
+        $params[] = $minPrice;
+        $params[] = $maxPrice;
+        $types .= 'dd';
+    }
+}
+
+// Bedrooms filter
+if (!empty($bedrooms)) {
+    $conditions[] = "p.bedrooms >= ?";
+    $params[] = intval($bedrooms);
+    $types .= 'i';
+}
+
+// Bathrooms filter
+if (!empty($bathrooms)) {
+    $conditions[] = "p.bathrooms >= ?";
+    $params[] = floatval($bathrooms);
+    $types .= 'd';
+}
+
+// Square feet filter
+if (!empty($squareFeet)) {
+    $sqftParts = explode('-', $squareFeet);
+    if (count($sqftParts) === 2) {
+        $minSqft = intval($sqftParts[0]);
+        $maxSqft = intval($sqftParts[1]);
+        $conditions[] = "p.square_feet BETWEEN ? AND ?";
+        $params[] = $minSqft;
+        $params[] = $maxSqft;
+        $types .= 'ii';
+    }
+}
+
+// Build WHERE clause
+$whereClause = implode(' AND ', $conditions);
+
+// Sort order
+$orderBy = "p.created_at DESC";
+switch ($sortBy) {
+    case 'featured':
+        $orderBy = "p.is_featured DESC, p.created_at DESC";
+        break;
+    case 'price_asc':
+        $orderBy = "p.price ASC";
+        break;
+    case 'price_desc':
+        $orderBy = "p.price DESC";
+        break;
+    case 'newest':
+        $orderBy = "p.created_at DESC";
+        break;
+}
+
+// =============================================
+// COUNT QUERY WITH FILTERS
+// =============================================
+$countSql = "SELECT COUNT(*) AS total FROM properties p WHERE $whereClause";
+$countStmt = $conn->prepare($countSql);
+
+if (!empty($params)) {
+    $countStmt->bind_param($types, ...$params);
+}
+
+$countStmt->execute();
+$countResult = $countStmt->get_result();
+
+if (!$countResult) {
+    die("Count query failed: " . $conn->error);
+}
+
+$totalProperties = $countResult->fetch_assoc()['total'];
+$totalPages = ceil($totalProperties / $perPage);
+
+// =============================================
+// MAIN QUERY WITH FILTERS
+// =============================================
+$sql = "
+    SELECT
+        p.id, p.title, p.description, p.price, p.property_type, p.status,
+        p.bedrooms, p.bathrooms, p.square_feet, p.lot_size, p.year_built,
+        p.address, p.city, p.state, p.zip_code, p.country,
+        p.latitude, p.longitude, p.agent_id, p.owner_id, p.is_featured, p.created_at,
+        (SELECT image_path FROM property_images
+         WHERE property_id = p.id
+         ORDER BY is_primary DESC, id ASC
+         LIMIT 1) AS image_url
+    FROM properties p
+    WHERE $whereClause
+    ORDER BY $orderBy
+    LIMIT ? OFFSET ?
+";
+
+// Add pagination parameters
+$params[] = $perPage;
+$params[] = $offset;
+$types .= 'ii';
+
+$stmt = $conn->prepare($sql);
+
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+
 $stmt->execute();
 $result = $stmt->get_result();
-$user = $result->fetch_assoc();
-$stmt->close();
 
-// After fetching user details
-if ($user['role'] !== 'buyer') {
-    // Redirect to appropriate dashboard
-    header("Location: {$user['role']}_dashboard.php");
-    exit;
+if (!$result) {
+    die("Properties query failed: " . $conn->error);
 }
 
-// Handle favorite toggle
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['property_id'])) {
-    $property_id = $_POST['property_id'];
-    $is_favorite = $_POST['is_favorite'];
+$properties = [];
 
-    if ($is_favorite == 'true') {
-        $stmt = $conn->prepare("DELETE FROM saved_properties WHERE user_id = ? AND property_id = ?");
-    } else {
-        $stmt = $conn->prepare("INSERT INTO saved_properties (user_id, property_id) VALUES (?, ?)");
-    }
-    $stmt->bind_param("ii", $user_id, $property_id);
-    $stmt->execute();
-    $stmt->close();
+if ($result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        // FIXED: Properly handle image paths
+        if (!empty($row['image_url'])) {
+            // Check if the path already contains 'uploads/'
+            if (strpos($row['image_url'], 'uploads/') === 0) {
+                $row['image_url'] = $row['image_url'];
+            } else {
+                $row['image_url'] = 'uploads/' . $row['image_url'];
+            }
+        } else {
+            // Use a placeholder if no image exists
+            $row['image_url'] = 'images/placeholder.jpg';
+        }
 
-    exit; // AJAX response only
-}
+        // Ensure numeric fields are properly typed and handle potential nulls for display robustness
+        $row['bathrooms'] = isset($row['bathrooms']) ? (float) $row['bathrooms'] : 0.0;
+        $row['square_feet'] = isset($row['square_feet']) ? (int) $row['square_feet'] : 0;
+        $row['bedrooms'] = isset($row['bedrooms']) ? (int) $row['bedrooms'] : 0; // Ensure bedrooms is also handled
+        $row['price'] = isset($row['price']) ? (float) $row['price'] : 0.0;
 
-// Fetch recommended properties
-$recommended_sql = "SELECT p.*, 
-                   (SELECT image_path FROM property_images WHERE property_id = p.id LIMIT 1) AS image_path,
-                   (SELECT COUNT(*) FROM saved_properties WHERE property_id = p.id AND user_id = $user_id) AS is_favorite
-                   FROM properties p
-                   WHERE p.status = 'available'
-                   ORDER BY p.created_at DESC
-                   LIMIT 6";
-$recommended_result = $conn->query($recommended_sql);
-
-// Fetch saved properties
-$saved_sql = "SELECT p.*, pi.image_path
-             FROM saved_properties sp
-             JOIN properties p ON sp.property_id = p.id
-             LEFT JOIN property_images pi ON p.id = pi.property_id AND pi.is_primary = 1
-             WHERE sp.user_id = $user_id
-             ORDER BY sp.saved_at DESC
-             LIMIT 3";
-$saved_result = $conn->query($saved_sql);
-
-// Fetch locations for dropdown
-$locations_sql = "SELECT DISTINCT CONCAT(city, ', ', state) AS location 
-                 FROM properties 
-                 ORDER BY city";
-$locations_result = $conn->query($locations_sql);
-$locations = [];
-while ($row = $locations_result->fetch_assoc()) {
-    $locations[] = $row['location'];
-}
-
-// Process search filters
-$search_results = [];
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['search'])) {
-    $location = $_GET['location'] ?? '';
-    $type = $_GET['type'] ?? 'any';
-    $price = $_GET['price'] ?? 'any';
-    $beds = $_GET['beds'] ?? 0;
-
-    // Build SQL query with filters
-    $search_sql = "SELECT p.*, 
-                  (SELECT image_path FROM property_images WHERE property_id = p.id LIMIT 1) AS image_path,
-                  (SELECT COUNT(*) FROM saved_properties WHERE property_id = p.id AND user_id = $user_id) AS is_favorite
-                  FROM properties p
-                  WHERE p.status = 'available'";
-
-    if (!empty($location)) {
-        list($city, $state) = explode(', ', $location);
-        $search_sql .= " AND p.city = '$city' AND p.state = '$state'";
-    }
-
-    if ($type !== 'any') {
-        $search_sql .= " AND p.property_type = '$type'";
-    }
-
-    if ($price !== 'any') {
-        list($minPrice, $maxPrice) = explode('-', $price);
-        $search_sql .= " AND p.price BETWEEN $minPrice AND $maxPrice";
-    }
-
-    if ($beds > 0) {
-        $search_sql .= " AND p.bedrooms >= $beds";
-    }
-
-    $search_result = $conn->query($search_sql);
-    while ($row = $search_result->fetch_assoc()) {
-        $search_results[] = $row;
+        $properties[] = $row;
     }
 }
 
-// Fetch property types for the dropdown
-$property_types_sql = "SELECT DISTINCT property_type FROM properties ORDER BY property_type";
-$property_types_result = $conn->query($property_types_sql);
-$property_types = [];
-while ($row = $property_types_result->fetch_assoc()) {
-    $property_types[] = $row['property_type'];
-}
-
+$conn->close(); // Close the database connection
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Buyer Dashboard - Real Estate AI</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Properties - Real Estate AI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --primary-teal: #0d9488;
@@ -140,98 +227,584 @@ while ($row = $property_types_result->fetch_assoc()) {
             --text-dark: #1f2937;
             --text-light: #6b7280;
             --border-gray: #e5e7eb;
-            --success-green: #34d399;
-            --info-blue: #60a5fa;
-            --modal-overlay: rgba(0, 0, 0, 0.6);
+            --shadow-light: rgba(0, 0, 0, 0.1);
         }
 
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
 
         body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Roboto", sans-serif;
             background-color: var(--neutral-bg);
             color: var(--text-dark);
-            display: flex;
-            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-teal), #0891b2);
+            color: #ffffff;
+            padding: 60px 20px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(255,255,255,0.1)"/></svg>');
+            background-size: cover;
+            opacity: 0.2;
+        }
+
+        header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            position: relative;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        header p {
+            font-size: 1.2rem;
+            max-width: 700px;
+            margin: 0 auto 30px;
             position: relative;
         }
 
-        .nav-links a.active {
-            background: rgba(255, 255, 255, 0.25) !important;
-            border-left: 4px solid var(--accent-gold);
+        /* SEARCH BAR STYLES */
+        .search-container {
+            max-width: 700px;
+            margin: 0 auto 30px;
+            position: relative;
         }
 
-        /* Sidebar Styles */
-        .sidebar {
-            width: 260px;
-            background: linear-gradient(to bottom, var(--primary-teal), #0a7c72);
-            color: white;
-            padding: 25px 15px;
-            height: 100vh;
-            position: fixed;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+        .search-box {
             display: flex;
-            flex-direction: column;
-            z-index: 100;
+            background: white;
+            border-radius: 60px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
         }
 
-        .brand {
+        .search-box input {
+            flex: 1;
+            border: none;
+            padding: 18px 25px;
+            font-size: 1.1rem;
+            outline: none;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .search-btn {
+            width: 70px;
+            background: var(--primary-teal);
+            color: white;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
-            margin-bottom: 35px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            justify-content: center;
         }
 
-        .brand i {
-            font-size: 28px;
-            margin-right: 12px;
-            color: var(--accent-gold);
+        .search-btn:hover {
+            background: #0f766e;
         }
 
-        .brand h1 {
-            font-size: 1.4rem;
-            font-weight: 700;
-        }
+        /* END SEARCH BAR STYLES */
 
-        /* Add dropdown styles */
-        .dropdown {
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
             position: relative;
-            display: inline-block;
-            width: 100%;
         }
 
-        .dropdown-content {
-            display: none;
-            position: absolute;
-            background-color: #f9f9f9;
-            width: 100%;
-            box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-            z-index: 1;
-            border-radius: 0 0 6px 6px;
-            max-height: 200px;
-            overflow-y: auto;
+        .nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 12px 24px;
+            border-radius: 30px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .dropdown-content div {
-            padding: 12px;
+        .nav a.active {
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .nav a:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .auth {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        .auth a {
+            padding: 12px 30px;
+            background-color: var(--accent-gold);
+            color: var(--text-dark);
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .auth a:hover {
+            background-color: #facc15;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Filter Section */
+        .filters {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+            margin-bottom: 40px;
+        }
+
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-dark);
+        }
+
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border-gray);
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: white;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .filter-btn {
+            padding: 12px 25px;
+            background: var(--primary-teal);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
             cursor: pointer;
-            border-bottom: 1px solid #ddd;
+            transition: all 0.3s ease;
         }
 
-        .dropdown-content div:hover {
-            background-color: #f1f1f1;
+        .filter-btn:hover {
+            background: #0f766e;
+            transform: translateY(-2px);
+        }
+
+        .reset-btn {
+            background: var(--border-gray);
+            color: var(--text-dark);
+        }
+
+        .reset-btn:hover {
+            background: #e2e8f0;
+        }
+
+        /* Property Grid */
+        .property-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .property-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .property-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .property-image {
+            height: 220px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .property-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .favorite-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+            color: var(--secondary-coral);
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .view-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary-teal);
+            /* Solid background */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            /* More rounded corners */
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            text-decoration: none;
+            /* Remove underline */
+            display: block;
+            /* Make it a block element */
+        }
+
+        .view-btn:hover {
+            background: #0f766e;
+            /* Slightly darker on hover */
+            transform: translateY(-2px);
+            /* Move up slightly on hover */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            /* Add subtle shadow */
+        }
+
+        .favorite-btn:hover {
+            background: white;
+            transform: scale(1.1);
+        }
+
+        .favorite-btn.active {
+            color: var(--secondary-coral);
+        }
+
+        /* MODAL REDESIGN */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 10000;
+            overflow-y: auto;
+            padding: 40px 20px;
+            box-sizing: border-box;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+        }
+
+        .modal-content {
+            background-color: white;
+            border-radius: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+            animation: modalOpen 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @keyframes modalOpen {
+            from {
+                opacity: 0;
+                transform: translateY(40px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            font-size: 1.8rem;
+            color: white;
+            cursor: pointer;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.5);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .close-modal:hover {
+            transform: rotate(90deg);
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        .modal-header {
+            position: relative;
+            height: 500px;
+            overflow: hidden;
+        }
+
+        .modal-main-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            transition: transform 0.5s ease;
+        }
+
+        .modal-image-nav {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            transform: translateY(-50%);
+            z-index: 10;
+        }
+
+        .nav-arrow {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--primary-teal);
+            font-size: 1.5rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-arrow:hover {
+            background: white;
+            transform: scale(1.1);
+        }
+
+        .modal-image-thumbnails {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 0 20px;
+            z-index: 10;
+        }
+
+        .modal-thumbnail {
+            width: 80px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-thumbnail:hover,
+        .modal-thumbnail.active {
+            transform: translateY(-5px);
+            border-color: var(--primary-teal);
+        }
+
+        .modal-body {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 40px;
+        }
+
+        .modal-left {
+            flex: 1;
+            min-width: 300px;
+            padding-right: 40px;
+        }
+
+        .modal-right {
+            width: 350px;
+            background: var(--neutral-bg);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .modal-title {
+            font-size: 2.2rem;
+            color: var(--text-dark);
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        .modal-price {
+            font-size: 2rem;
+            color: var(--primary-teal);
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .modal-location {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 25px;
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        .modal-location i {
+            color: var(--primary-teal);
+            font-size: 1.3rem;
+        }
+
+        .modal-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid var(--border-gray);
+        }
+
+        .meta-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(13, 148, 136, 0.05);
+            border-radius: 10px;
+        }
+
+        .meta-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--primary-teal);
+            margin-bottom: 5px;
+        }
+
+        .meta-label {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .modal-description {
+            margin-bottom: 30px;
+            line-height: 1.8;
+            color: var(--text-dark);
+            font-size: 1.05rem;
+        }
+
+        .modal-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-dark);
+            font-size: 1rem;
+        }
+
+        .feature-item i {
+            color: var(--primary-teal);
+            width: 25px;
+            text-align: center;
         }
 
         .toast {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: var(--primary-teal);
+            background: #0d9488;
             color: white;
             padding: 15px 25px;
             border-radius: 8px;
@@ -248,891 +821,214 @@ while ($row = $property_types_result->fetch_assoc()) {
         }
 
         .toast.error {
-            background: var(--secondary-coral);
-        }
-
-        .show {
-            display: block;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            margin-bottom: 30px;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-        }
-
-        .user-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(45deg,
-                    var(--accent-gold),
-                    var(--info-blue));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1.2rem;
-            margin-right: 15px;
-        }
-
-        .user-details h3 {
-            font-size: 1.1rem;
-            margin-bottom: 5px;
-        }
-
-        .user-details span {
-            font-size: 0.85rem;
-            opacity: 0.8;
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.15);
-            padding: 3px 8px;
-            border-radius: 20px;
-        }
-
-        .nav-links {
-            flex-grow: 1;
-        }
-
-        .nav-links a {
-            display: flex;
-            align-items: center;
-            color: white;
-            padding: 14px 15px;
-            text-decoration: none;
-            font-size: 1rem;
-            margin-bottom: 8px;
-            border-radius: 6px;
-            transition: all 0.3s;
-        }
-
-        .nav-links a:hover,
-        .nav-links a.active {
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        .nav-links a i {
-            font-size: 1.2rem;
-            width: 30px;
-            margin-right: 12px;
-        }
-
-        .logout-btn {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 6px;
-            font-size: 1rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.3s;
-        }
-
-        .logout-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .logout-btn i {
-            margin-right: 8px;
-        }
-
-        /* Main Content Styles */
-        .content {
-            flex-grow: 1;
-            margin-left: 260px;
-            padding: 30px;
-        }
-
-        .dashboard-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .dashboard-header h1 {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: var(--primary-teal);
-        }
-
-        .date-display {
-            font-size: 1rem;
-            color: var(--text-light);
-            background: var(--card-bg);
-            padding: 8px 15px;
-            border-radius: 20px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-            display: flex;
-            align-items: center;
-        }
-
-        .date-display i {
-            margin-right: 8px;
-        }
-
-        .search-container {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            margin-bottom: 30px;
-        }
-
-        .search-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .search-header h2 {
-            font-size: 1.5rem;
-            color: var(--text-dark);
-            position: relative;
-            padding-bottom: 10px;
-        }
-
-        .search-header h2::after {
-            content: "";
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 50px;
-            height: 3px;
-            background: var(--primary-teal);
-            border-radius: 3px;
-        }
-
-        .search-filters {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .filter-group label {
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-dark);
-        }
-
-        .filter-group select,
-        .filter-group input {
-            padding: 12px;
-            border: 1px solid var(--border-gray);
-            border-radius: 6px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-        }
-
-        .filter-group select:focus,
-        .filter-group input:focus {
-            outline: none;
-            border-color: var(--primary-teal);
-        }
-
-        .search-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 15px;
-        }
-
-        .search-btn {
-            background: var(--primary-teal);
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.3s;
-            display: flex;
-            align-items: center;
-        }
-
-        .search-btn:hover {
-            background: #0f766e;
-        }
-
-        .reset-btn {
-            background: var(--border-gray);
-            color: var(--text-dark);
-            border: none;
-            padding: 12px 25px;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        .reset-btn:hover {
-            background: #e5e7eb;
-        }
-
-        .dashboard-section {
-            margin-bottom: 30px;
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .section-header h2 {
-            font-size: 1.5rem;
-            color: var(--text-dark);
-            position: relative;
-            padding-bottom: 10px;
-        }
-
-        .section-header h2::after {
-            content: "";
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 50px;
-            height: 3px;
-            background: var(--primary-teal);
-            border-radius: 3px;
-        }
-
-        .view-all {
-            color: var(--primary-teal);
-            font-weight: 600;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-        }
-
-        .view-all i {
-            margin-left: 5px;
-            transition: transform 0.3s;
-        }
-
-        .view-all:hover i {
-            transform: translateX(3px);
-        }
-
-        .property-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 25px;
-        }
-
-        .property-card {
-            background: var(--card-bg);
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s;
-        }
-
-        .property-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
-        }
-
-        .property-image {
-            height: 200px;
-            position: relative;
-            background-size: cover;
-            background-position: center;
-        }
-
-        .property-image::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(to top,
-                    rgba(0, 0, 0, 0.5),
-                    transparent 40%);
-        }
-
-        .messages-container {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .messages-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-gray);
-        }
-
-        .messages-header h3 {
-            font-size: 1.3rem;
-        }
-
-        .new-message-btn {
-            background: var(--primary-teal);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-        }
-
-        .new-message-btn i {
-            margin-right: 8px;
-        }
-
-        .viewings-container {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .viewings-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-gray);
-        }
-
-        .viewings-header h3 {
-            font-size: 1.3rem;
-        }
-
-        .viewings-list {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .viewing-card {
-            display: flex;
-            background: #f8fafc;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
-        }
-
-        .viewing-image {
-            width: 200px;
-            background-size: cover;
-            background-position: center;
-        }
-
-        .viewing-details {
-            flex: 1;
-            padding: 20px;
-        }
-
-        .viewing-details h4 {
-            font-size: 1.1rem;
-            margin-bottom: 15px;
-            color: var(--text-dark);
-        }
-
-        .viewing-meta {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 15px;
-            color: var(--text-light);
-        }
-
-        .viewing-meta span {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .status-badge {
-            align-self: flex-start;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-top: 5px;
-        }
-
-        .status-badge.confirmed {
-            background: var(--success-green);
-            color: white;
-        }
-
-        .status-badge.pending {
-            background: var(--accent-gold);
-            color: #854d0e;
-        }
-
-        .viewing-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .viewing-actions .btn {
-            padding: 8px 15px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            border: none;
-        }
-
-        .reschedule-btn,
-        .confirm-btn {
-            background: rgba(96, 165, 250, 0.1);
-            color: var(--info-blue);
-        }
-
-        .cancel-btn {
-            background: rgba(248, 113, 113, 0.1);
-            color: var(--secondary-coral);
-        }
-
-        @media (max-width: 768px) {
-            .viewing-card {
-                flex-direction: column;
-            }
-
-            .viewing-image {
-                width: 100%;
-                height: 150px;
-            }
-
-            .viewing-actions {
-                flex-direction: column;
-            }
-        }
-
-        .conversation-list {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .conversation {
-            display: flex;
-            padding: 15px;
-            border-radius: 8px;
-            background: #f8fafc;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
-        }
-
-        .agents-container {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .agents-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-gray);
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .agents-header h3 {
-            font-size: 1.3rem;
-        }
-
-        .agent-search {
-            position: relative;
-            width: 300px;
-        }
-
-        .agent-search input {
-            width: 100%;
-            padding: 10px 15px 10px 40px;
-            border: 1px solid var(--border-gray);
-            border-radius: 6px;
-            font-size: 0.95rem;
-            transition: border-color 0.3s;
-        }
-
-        .agent-search input:focus {
-            outline: none;
-            border-color: var(--primary-teal);
-        }
-
-        .agent-search i {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-light);
-        }
-
-        .agents-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 25px;
+            background: #f87171;
         }
 
         .agent-card {
-            background: #f8fafc;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
-            display: flex;
-            transition: all 0.3s;
-        }
-
-        .agent-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
-        }
-
-        .agent-avatar {
-            width: 120px;
-            background-size: cover;
-            background-position: center;
-            flex-shrink: 0;
-        }
-
-        .agent-details {
-            flex: 1;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .agent-details h4 {
-            font-size: 1.2rem;
-            margin-bottom: 8px;
-            color: var(--text-dark);
-        }
-
-        .agent-rating {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            margin-bottom: 15px;
-        }
-
-        .agent-rating i {
-            color: var(--accent-gold);
-        }
-
-        .agent-rating span {
-            font-size: 0.9rem;
-            color: var(--text-light);
-            margin-left: 8px;
-        }
-
-        .agent-meta {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 15px;
-            font-size: 0.9rem;
-            color: var(--text-light);
-        }
-
-        .agent-meta span {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .agent-contact {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 15px;
-            font-size: 0.9rem;
-            color: var(--text-light);
-        }
-
-        .agent-contact span {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .agent-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: auto;
-        }
-
-        .agent-actions .btn {
-            padding: 8px 15px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            border: none;
-            flex: 1;
-            justify-content: center;
-        }
-
-        .contact-btn {
-            background: rgba(96, 165, 250, 0.1);
-            color: var(--info-blue);
-        }
-
-        .schedule-btn {
-            background: rgba(13, 148, 136, 0.1);
-            color: var(--primary-teal);
-        }
-
-        /* Schedule Modal Styles */
-        .schedule-agent-info {
             display: flex;
             align-items: center;
             gap: 15px;
             margin-bottom: 25px;
-            padding-bottom: 15px;
+            padding-bottom: 25px;
             border-bottom: 1px solid var(--border-gray);
         }
 
-        .agent-avatar-sm {
-            width: 60px;
-            height: 60px;
+        .agent-avatar {
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
-            background-size: cover;
-            background-position: center;
-            flex-shrink: 0;
+            object-fit: cover;
+            border: 3px solid var(--primary-teal);
         }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
+        .agent-info h4 {
+            font-size: 1.3rem;
+            margin-bottom: 5px;
             color: var(--text-dark);
         }
 
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--border-gray);
-            border-radius: 6px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
+        .agent-info p {
+            color: var(--text-light);
+            font-size: 0.95rem;
         }
 
-        .form-group textarea {
-            min-height: 100px;
-            resize: vertical;
+        .modal-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
 
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
+        .modal-btn {
+            padding: 16px 25px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.05rem;
+        }
+
+        .contact-btn {
+            background: var(--primary-teal);
+            color: white;
+            box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);
+        }
+
+        .contact-btn:hover {
+            background: #0c857a;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(13, 148, 136, 0.4);
+        }
+
+        .favorite-btn-modal {
+            background: white;
+            color: var(--text-dark);
+            border: 2px solid var(--border-gray);
+        }
+
+        .favorite-btn-modal:hover {
+            background: #f8f8f8;
             border-color: var(--primary-teal);
         }
 
-        @media (max-width: 768px) {
-            .agents-header {
+        .modal-footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 25px 40px;
+            background: var(--neutral-bg);
+            border-top: 1px solid var(--border-gray);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .property-id {
+            color: var(--text-light);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .social-share {
+            display: flex;
+            gap: 12px;
+        }
+
+        .share-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f0f0f0;
+            color: var(--text-dark);
+            transition: all 0.3s ease;
+        }
+
+        .share-btn:hover {
+            transform: translateY(-3px);
+            background: var(--primary-teal);
+            color: white;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .modal-body {
                 flex-direction: column;
-                align-items: flex-start;
+                padding: 30px;
             }
 
-            .agent-search {
+            .modal-left {
+                padding-right: 0;
+                margin-bottom: 30px;
+            }
+
+            .modal-right {
                 width: 100%;
             }
 
-            .agents-grid {
+            .modal-header {
+                height: 400px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .modal-header {
+                height: 300px;
+            }
+
+            .modal-title {
+                font-size: 1.8rem;
+            }
+
+            .modal-price {
+                font-size: 1.7rem;
+            }
+
+            .modal-body {
+                padding: 25px;
+            }
+
+            .modal-footer {
+                padding: 20px 25px;
+            }
+
+            .nav-arrow {
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
+
+            .modal-thumbnail {
+                width: 60px;
+                height: 45px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .modal-header {
+                height: 250px;
+            }
+
+            .modal-title {
+                font-size: 1.5rem;
+            }
+
+            .modal-body {
+                padding: 20px;
+            }
+
+            .modal-meta {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+
+            .modal-features {
                 grid-template-columns: 1fr;
             }
 
-            .agent-card {
+            .modal-footer {
                 flex-direction: column;
+                align-items: center;
             }
-
-            .agent-avatar {
-                width: 100%;
-                height: 200px;
-            }
-
-            .agent-actions {
-                flex-direction: column;
-            }
-        }
-
-        .conversation:hover,
-        .conversation.active {
-            background: rgba(13, 148, 136, 0.05);
-            border-left: 3px solid var(--primary-teal);
-        }
-
-        .agent-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, var(--primary-teal), var(--info-blue));
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 1.2rem;
-            margin-right: 15px;
-            flex-shrink: 0;
-        }
-
-        .conversation-details {
-            flex-grow: 1;
-            overflow: hidden;
-        }
-
-        .conversation-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-        }
-
-        .conversation-header h4 {
-            font-size: 1.1rem;
-            color: var(--text-dark);
-        }
-
-        .message-time {
-            color: var(--text-light);
-            font-size: 0.85rem;
-        }
-
-        .message-preview {
-            color: var(--text-light);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-size: 0.9rem;
-        }
-
-        .unread-indicator {
-            background: var(--secondary-coral);
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-            font-weight: bold;
-            flex-shrink: 0;
-            align-self: center;
-        }
-
-        /* Responsive styles */
-        @media (max-width: 768px) {
-            .messages-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-
-            .new-message-btn {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-
-        .property-image img {
-            max-width: 100%;
-            height: auto;
-            object-fit: cover;
-        }
-
-        .placeholder-image {
-            background-color: #f0f0f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 200px;
-            color: #666;
-            font-style: italic;
         }
 
         .property-badge {
             position: absolute;
             top: 15px;
-            right: 15px;
-            background: white;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            z-index: 2;
-        }
-
-        .badge-new {
-            background: var(--secondary-coral);
-            color: white;
-        }
-
-        .badge-featured {
+            left: 15px;
             background: var(--accent-gold);
             color: #854d0e;
-        }
-
-        .favorite-btn {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(255, 255, 255, 0.8);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            border: none;
-            color: var(--secondary-coral);
-            font-size: 1.1rem;
-            transition: all 0.3s;
-            z-index: 2;
-        }
-
-        .favorite-btn.active {
-            color: var(--secondary-coral);
-        }
-
-        .favorite-btn:hover {
-            background: white;
-            transform: scale(1.1);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            z-index: 10;
         }
 
         .property-details {
@@ -1140,13 +1036,13 @@ while ($row = $property_types_result->fetch_assoc()) {
         }
 
         .property-details h3 {
-            font-size: 1.2rem;
+            font-size: 1.4rem;
             margin-bottom: 10px;
             color: var(--text-dark);
         }
 
         .property-price {
-            font-size: 1.4rem;
+            font-size: 1.6rem;
             font-weight: 700;
             color: var(--primary-teal);
             margin-bottom: 15px;
@@ -1154,1327 +1050,793 @@ while ($row = $property_types_result->fetch_assoc()) {
 
         .property-meta {
             display: flex;
+            justify-content: space-between;
             margin-bottom: 15px;
             color: var(--text-light);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             flex-wrap: wrap;
         }
 
         .property-meta span {
-            margin-right: 15px;
             display: flex;
             align-items: center;
-            margin-bottom: 5px;
         }
 
         .property-meta i {
             margin-right: 5px;
-        }
-
-        .property-address {
-            color: var(--text-light);
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-        }
-
-        .property-address i {
-            margin-right: 8px;
-        }
-
-        .property-actions {
-            display: flex;
-            justify-content: space-between;
-            padding-top: 15px;
-            border-top: 1px solid var(--border-gray);
-        }
-
-        .property-actions button {
-            padding: 8px 15px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            border: none;
-            display: flex;
-            align-items: center;
-        }
-
-        .property-actions button i {
-            margin-right: 5px;
-        }
-
-        .details-btn {
-            background: rgba(13, 148, 136, 0.1);
             color: var(--primary-teal);
         }
 
-        .details-btn:hover {
-            background: rgba(13, 148, 136, 0.2);
-        }
-
-        .contact-btn {
-            background: rgba(96, 165, 250, 0.1);
-            color: var(--info-blue);
-        }
-
-        .contact-btn:hover {
-            background: rgba(96, 165, 250, 0.2);
-        }
-
-        .saved-container {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px;
+        .property-location {
             color: var(--text-light);
-        }
-
-        .empty-state i {
-            font-size: 3rem;
             margin-bottom: 20px;
-            color: var(--border-gray);
-        }
-
-        .empty-state p {
-            max-width: 400px;
-            margin: 0 auto;
-            line-height: 1.6;
-        }
-
-        .saved-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 5px;
+        }
+
+        .property-description {
             margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-gray);
+            color: var(--text-light);
+            font-size: 0.95rem;
         }
 
-        html {
-            scroll-behavior: smooth;
-        }
-
-        .saved-header h3 {
-            font-size: 1.3rem;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
+        .view-btn {
             width: 100%;
-            height: 100%;
-            background-color: var(--modal-overlay);
-            z-index: 1000;
+            padding: 12px;
+            background: var(--primary-teal);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-btn:hover {
+            background: #0f766e;
+            transform: translateY(-2px);
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
             justify-content: center;
+            gap: 10px;
+            margin-bottom: 50px;
+        }
+
+        .page-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
             align-items: center;
-            opacity: 0;
+            justify-content: center;
+            background: var(--card-bg);
+            border: 1px solid var(--border-gray);
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .page-btn.active,
+        .page-btn:hover {
+            background: var(--primary-teal);
+            color: white;
+            border-color: var(--primary-teal);
+        }
+
+        .page-btn.dots {
+            border: none;
+            background: transparent;
+            cursor: default;
+        }
+
+        .container header {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 50px;
+        }
+
+        .page-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-bg);
+            border: 1px solid var(--border-gray);
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            text-decoration: none;
+            /* Remove underline */
+        }
+
+        .page-btn.active,
+        .page-btn:hover {
+            background: var(--primary-teal);
+            color: white;
+            border-color: var(--primary-teal);
+            text-decoration: none;
+            /* Ensure no underline on hover */
+        }
+
+        /* Footer */
+        footer {
+            background: var(--primary-teal);
+            color: white;
+            padding: 40px 0;
+            margin-top: 80px;
+            border-radius: 8px;
+        }
+
+        .footer-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .footer-logo {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
             transition: opacity 0.3s ease;
         }
 
-        .modal.active {
-            display: flex;
-            opacity: 1;
+        .footer-links a:hover {
+            opacity: 0.8;
         }
 
-        .modal-content {
-            background-color: var(--card-bg);
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-        }
-
-        .modal.active .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border-gray);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: relative;
-        }
-
-        .modal-header::after {
-            content: "";
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(to right,
-                    var(--primary-teal),
-                    var(--info-blue));
-        }
-
-        .modal-header h3 {
-            color: var(--text-dark);
-            font-size: 1.4rem;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-light);
-            transition: color 0.3s;
-        }
-
-        .close-btn:hover {
-            color: var(--secondary-coral);
-        }
-
-        .modal-body {
-            padding: 20px;
-        }
-
-        .modal-image {
-            height: 300px;
-            background-size: cover;
-            background-position: center;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .modal-details {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .detail-item {
-            background: #f8fafc;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .detail-label {
-            font-size: 0.9rem;
-            color: var(--text-light);
-            margin-bottom: 5px;
-        }
-
-        .detail-value {
-            font-weight: 600;
-            color: var(--text-dark);
-            font-size: 1.1rem;
-        }
-
-        .detail-value.price {
-            color: var(--primary-teal);
-            font-size: 1.3rem;
-        }
-
-        .modal-description {
+        .copyright {
             margin-top: 20px;
-            line-height: 1.6;
-            color: var(--text-dark);
-        }
-
-        .modal-footer {
-            padding: 20px;
-            border-top: 1px solid var(--border-gray);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .user-avatar {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .user-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .edit-icon {
-            margin-left: 8px;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.8rem;
-            transition: color 0.3s;
-        }
-
-        .edit-icon:hover {
-            color: var(--accent-gold);
-        }
-
-        #username-edit-form {
-            display: none;
-            margin-top: 10px;
-        }
-
-        #username-edit-form input {
-            width: 100%;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-        }
-
-        #username-edit-form button {
-            margin-top: 5px;
-            padding: 5px 10px;
-            background: var(--primary-teal);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            border: none;
-            display: flex;
-            align-items: center;
-        }
-
-        .btn-primary {
-            background: var(--primary-teal);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #0f766e;
-        }
-
-        .btn-secondary {
-            background: var(--border-gray);
-            color: var(--text-dark);
-        }
-
-        .btn-secondary:hover {
-            background: #e0e0e0;
-        }
-
-        /* Search Results Message */
-        .search-results-message {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            display: none;
-        }
-
-        .search-results-message.show {
-            display: block;
-        }
-
-        .search-results-message i {
-            margin-right: 10px;
-            color: var(--primary-teal);
-        }
-
-        /* Responsive styles */
-        @media (max-width: 992px) {
-            .sidebar {
-                width: 220px;
-            }
-
-            .content {
-                margin-left: 220px;
-            }
+            font-size: 0.9rem;
+            opacity: 0.8;
         }
 
         @media (max-width: 768px) {
-            .sidebar {
-                width: 70px;
-                padding: 20px 10px;
-                overflow: hidden;
-            }
-
-            .brand h1,
-            .user-details,
-            .nav-links span {
-                display: none;
-            }
-
-            .brand {
-                justify-content: center;
-                padding: 0;
-                border: none;
-                margin-bottom: 30px;
-            }
-
-            .user-avatar {
-                margin: 0 auto;
-            }
-
-            .content {
-                margin-left: 70px;
-                padding: 20px;
+            header h1 {
+                font-size: 2.2rem;
             }
 
             .property-grid {
                 grid-template-columns: 1fr;
             }
 
-            .dashboard-header {
+            .nav {
                 flex-direction: column;
-                align-items: flex-start;
+                align-items: center;
             }
 
-            .date-display {
-                margin-top: 10px;
+            .nav a {
+                width: 80%;
+                text-align: center;
             }
 
-            .search-filters {
-                grid-template-columns: 1fr;
+            .search-container {
+                max-width: 90%;
             }
 
-            .modal-details {
-                grid-template-columns: 1fr;
+            .search-box input {
+                padding: 15px 20px;
+                font-size: 1rem;
+            }
+
+            .filter-row {
+                flex-direction: column;
             }
         }
     </style>
 </head>
 
 <body>
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="brand">
-            <i class="fas fa-home"></i>
-            <h1>RealEstate AI</h1>
-        </div>
+    <div class="container">
+        <header>
+            <h1>Find Your Dream Property</h1>
+            <p>
+                Browse our extensive collection of properties with AI-powered insights
+            </p>
 
-        <div class="user-info" id="user-profile-section">
-            <div class="user-avatar">
-                <?php if (isset($user['profile_pic']) && !empty($user['profile_pic'])): ?>
-                    <img src="<?= $user['profile_pic'] ?>" alt="Profile Picture">
-                <?php else: ?>
-                    <?= substr($user['username'], 0, 2) ?>
-                <?php endif; ?>
-            </div>
-            <div class="user-details">
-                <h3>
-                    <span id="username-display"><?= $user['username'] ?></span>
-                    <a href="#" id="edit-username-btn" class="edit-icon">
-                        <i class="fas fa-pencil-alt"></i>
-                    </a>
-                </h3>
-            </div>
-        </div>
-
-        <div class="nav-links">
-            <a href="#" class="active" id="find-properties-link">
-                <i class="fas fa-search"></i>
-                <span>Find Properties</span>
-            </a>
-            <a href="#saved-properties-section" id="saved-properties-link">
-                <i class="fas fa-heart"></i>
-                <span>Saved Properties</span>
-            </a>
-            <a href="#">
-                <i class="fas fa-bell"></i>
-                <span>Price Alerts</span>
-            </a>
-            <a href="#messages-section" id="messages-link">
-                <i class="fas fa-comments"></i>
-                <span>Messages</span>
-            </a>
-            <a href="#viewings-section" id="viewings-link">
-                <i class="fas fa-calendar-check"></i>
-                <span>Viewings</span>
-            </a>
-            <a href="#agents-section" id="agents-link">
-                <i class="fas fa-user-tie"></i>
-                <span>My Agents</span>
-            </a>
-        </div>
-
-        <button class="logout-btn" id="logout-btn">
-            <i class="fas fa-sign-out-alt"></i>
-            <span>Logout</span>
-        </button>
-    </div>
-
-    <!-- Main Content -->
-    <div class="content">
-        <div class="dashboard-header">
-            <h1>Find Your Dream Home</h1>
-            <div class="date-display">
-                <i class="far fa-calendar"></i>
-                <span id="current-date"></span>
-            </div>
-        </div>
-
-        <!-- Search Section -->
-        <div class="search-container">
-            <div class="search-header">
-                <h2>Advanced Property Search</h2>
-            </div>
-
-            <form method="GET" id="search-form">
-                <div class="search-filters">
-                    <div class="filter-group">
-                        <label>Location</label>
-                        <div class="dropdown">
-                            <input type="text" id="location-input" name="location"
-                                placeholder="City, Neighborhood, or ZIP" autocomplete="off"
-                                value="<?= isset($_GET['location']) ? htmlspecialchars($_GET['location']) : '' ?>">
-                            <div class="dropdown-content" id="location-dropdown"> <?php foreach ($locations as $loc): ?>
-                                    <div onclick="selectLocation('<?= $loc ?>')">
-                                        <?= $loc ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Property Type Filter -->
-                    <div class="filter-group">
-                        <label>Property Type</label>
-                        <select id="type-select" name="type">
-                            <option value="any" <?= ($_GET['type'] ?? 'any') === 'any' ? 'selected' : '' ?>>Any Type
-                            </option>
-                            <?php foreach ($property_types as $type): ?>
-                                <option value="<?= $type ?>" <?= ($_GET['type'] ?? '') === $type ? 'selected' : '' ?>>
-                                    <?= ucfirst($type) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <!-- Price Range Filter -->
-                    <div class="filter-group">
-                        <label>Price Range</label>
-                        <select id="price-select" name="price">
-                            <option value="any" <?= ($_GET['price'] ?? 'any') === 'any' ? 'selected' : '' ?>>Any Price
-                            </option>
-                            <option value="0-200000" <?= ($_GET['price'] ?? '') === '0-200000' ? 'selected' : '' ?>>Under
-                                $200,000</option>
-                            <option value="200000-400000" <?= ($_GET['price'] ?? '') === '200000-400000' ? 'selected' : '' ?>>$200,000 - $400,000</option>
-                            <option value="400000-600000" <?= ($_GET['price'] ?? '') === '400000-600000' ? 'selected' : '' ?>>$400,000 - $600,000</option>
-                            <option value="600000-800000" <?= ($_GET['price'] ?? '') === '600000-800000' ? 'selected' : '' ?>>$600,000 - $800,000</option>
-                            <option value="800000-999999999" <?= ($_GET['price'] ?? '') === '800000-999999999' ? 'selected' : '' ?>>Over $800,000</option>
-                        </select>
-                    </div>
-
-                    <!-- Bedrooms Filter -->
-                    <div class=" filter-group">
-                        <label>Bedrooms</label>
-                        <select id="beds-select" name="beds">
-                            <option value="0" <?= ($_GET['beds'] ?? 0) == 0 ? 'selected' : '' ?>>Any
-                            </option>
-                            <option value="1" <?= ($_GET['beds'] ?? 0) == 1 ? 'selected' : '' ?>>1+
-                            </option>
-                            <option value="2" <?= ($_GET['beds'] ?? 0) == 2 ? 'selected' : '' ?>>2+
-                            </option>
-                            <option value="3" <?= ($_GET['beds'] ?? 0) == 3 ? 'selected' : '' ?>>3+
-                            </option>
-                            <option value="4" <?= ($_GET['beds'] ?? 0) == 4 ? 'selected' : '' ?>>4+
-                            </option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="search-actions">
-                    <button type="button" class="reset-btn" id="reset-btn">Reset Filters</button>
-                    <button type="submit" class="search-btn" name="search">
-                        <i class="fas fa-search"></i> Search Properties
+            <!-- Search Bar -->
+            <form method="GET" action="properties.php" class="search-container">
+                <div class="search-box">
+                    <input type="text" placeholder="Search properties, locations, or keywords..." name="search"
+                        value="<?= htmlspecialchars($searchTerm) ?>">
+                    <button type="submit" class="search-btn">
+                        <i class="fas fa-search"></i>
                     </button>
                 </div>
             </form>
-        </div>
 
-        <!-- Search Results -->
-        <?php if (!empty($search_results)): ?>
-            <div class="search-results-message show">
-                <i class="fas fa-info-circle"></i>
-                <span>Found
-                    <?= count($search_results) ?> properties matching your search
-                </span>
+            <!-- Navbar Links -->
+            <div class="nav">
+                <a href="index.html">Home</a>
+                <a href="#" class="active">Properties</a>
+                <a href="about.html">About</a>
+                <a href="contact.html">Contact</a>
             </div>
 
-            <div class="dashboard-section">
-                <div class="section-header">
-                    <h2>Search Results</h2>
+            <div class="auth">
+                <a href="signin.html"><i class="fas fa-sign-in-alt"></i> Sign In</a>
+                <a href="register.html"><i class="fas fa-user-plus"></i> Register</a>
+            </div>
+        </header>
+
+        <!-- Filters Section -->
+        <form method="GET" action="properties.php">
+            <input type="hidden" name="page" value="1">
+            <section class="filters">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="propertyType">Property Type</label>
+                        <select id="propertyType" name="type">
+                            <option value="">All Types</option>
+                            <option value="House" <?= $propertyType == 'House' ? 'selected' : '' ?>>House</option>
+                            <option value="Apartment" <?= $propertyType == 'Apartment' ? 'selected' : '' ?>>Apartment
+                            </option>
+                            <option value="Condo" <?= $propertyType == 'Condo' ? 'selected' : '' ?>>Condo</option>
+                            <option value="Land" <?= $propertyType == 'Land' ? 'selected' : '' ?>>Land</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="priceRange">Price Range</label>
+                        <select id="priceRange" name="price">
+                            <option value="">Any Price</option>
+                            <option value="0-100000" <?= $priceRange == '0-100000' ? 'selected' : '' ?>>Under $100,000
+                            </option>
+                            <option value="100001-300000" <?= $priceRange == '100001-300000' ? 'selected' : '' ?>>$100,000
+                                - $300,000</option>
+                            <option value="300001-500000" <?= $priceRange == '300001-500000' ? 'selected' : '' ?>>$300,000
+                                - $500,000</option>
+                            <option value="500001-800000" <?= $priceRange == '500001-800000' ? 'selected' : '' ?>>$500,000
+                                - $800,000</option>
+                            <option value="800001-1200000" <?= $priceRange == '800001-1200000' ? 'selected' : '' ?>>
+                                $800,000 - $1.2M</option>
+                            <option value="1200001-999999999" <?= $priceRange == '1200001-999999999' ? 'selected' : '' ?>>
+                                Over $1.2M</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="bedrooms">Bedrooms</label>
+                        <select id="bedrooms" name="beds">
+                            <option value="">Any</option>
+                            <option value="1" <?= $bedrooms == '1' ? 'selected' : '' ?>>1+</option>
+                            <option value="2" <?= $bedrooms == '2' ? 'selected' : '' ?>>2+</option>
+                            <option value="3" <?= $bedrooms == '3' ? 'selected' : '' ?>>3+</option>
+                            <option value="4" <?= $bedrooms == '4' ? 'selected' : '' ?>>4+</option>
+                            <option value="5" <?= $bedrooms == '5' ? 'selected' : '' ?>>5+</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div class="property-grid">
-                    <?php foreach ($search_results as $property): ?>
-                        <?php include 'property_card.php'; ?>
-                    <?php endforeach; ?>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="bathrooms">Bathrooms</label>
+                        <select id="bathrooms" name="baths">
+                            <option value="">Any</option>
+                            <option value="1" <?= $bathrooms == '1' ? 'selected' : '' ?>>1+</option>
+                            <option value="2" <?= $bathrooms == '2' ? 'selected' : '' ?>>2+</option>
+                            <option value="3" <?= $bathrooms == '3' ? 'selected' : '' ?>>3+</option>
+                            <option value="4" <?= $bathrooms == '4' ? 'selected' : '' ?>>4+</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="squareFeet">Square Feet</label>
+                        <select id="squareFeet" name="sqft">
+                            <option value="">Any Size</option>
+                            <option value="0-1000" <?= $squareFeet == '0-1000' ? 'selected' : '' ?>>Under 1,000 sqft
+                            </option>
+                            <option value="1000-1500" <?= $squareFeet == '1000-1500' ? 'selected' : '' ?>>1,000 - 1,500
+                                sqft</option>
+                            <option value="1500-2000" <?= $squareFeet == '1500-2000' ? 'selected' : '' ?>>1,500 - 2,000
+                                sqft</option>
+                            <option value="2000-3000" <?= $squareFeet == '2000-3000' ? 'selected' : '' ?>>2,000 - 3,000
+                                sqft</option>
+                            <option value="3000-999999" <?= $squareFeet == '3000-999999' ? 'selected' : '' ?>>Over 3,000
+                                sqft</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="sortBy">Sort By</label>
+                        <select id="sortBy" name="sort">
+                            <option value="featured" <?= $sortBy == 'featured' ? 'selected' : '' ?>>Featured</option>
+                            <option value="price_asc" <?= $sortBy == 'price_asc' ? 'selected' : '' ?>>Price: Low to High
+                            </option>
+                            <option value="price_desc" <?= $sortBy == 'price_desc' ? 'selected' : '' ?>>Price: High to Low
+                            </option>
+                            <option value="newest" <?= $sortBy == 'newest' ? 'selected' : '' ?>>Newest</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-        <?php endif; ?>
 
-        <!-- Recommended Properties Section -->
-        <div class="dashboard-section">
-            <div class="section-header">
-                <h2>Recommended For You</h2>
-                <a href="properties.php" class="view-all">
-                    View All <i class="fas fa-arrow-right"></i>
-                </a>
-            </div>
-
-            <div class="property-grid" id="recommended-grid">
-                <?php while ($property = $recommended_result->fetch_assoc()): ?>
-                    <?php include 'property_card.php'; ?>
-                <?php endwhile; ?>
-            </div>
-        </div>
-
-        <!-- Saved Properties Section -->
-        <div class="dashboard-section" id="saved-properties-section">
-            <div class="section-header">
-                <h2>Your Saved Properties</h2>
-                <a href="#" class="view-all">
-                    View All <i class="fas fa-arrow-right"></i>
-                </a>
-            </div>
-
-            <div class="saved-container">
-                <div class="saved-header">
-                    <h3>Recently Saved (<?= $saved_result->num_rows ?>)</h3>
+                <div class="filter-actions">
+                    <button type="submit" class="filter-btn">Apply Filters</button>
+                    <a href="properties.php" class="filter-btn reset-btn">Reset Filters</a>
                 </div>
+            </section>
+        </form>
 
-                <div class="property-grid">
-                    <?php if ($saved_result->num_rows > 0): ?>
-                        <?php while ($property = $saved_result->fetch_assoc()): ?>
-                            <?php include 'property_card.php'; ?>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <i class="far fa-heart"></i>
-                            <h3>No Saved Properties</h3>
-                            <p>Save properties you're interested in by clicking the heart icon</p>
+        <!-- Property Grid -->
+        <div class="property-grid">
+            <?php if (!empty($properties)): ?>
+                <?php foreach ($properties as $property): ?>
+                    <div class="property-card">
+                        <div class="property-image">
+                            <img src="<?php echo htmlspecialchars($property['image_url']); ?>"
+                                alt="<?php echo htmlspecialchars($property['title']); ?>" />
+                            <button class="favorite-btn"><i class="far fa-heart"></i></button>
+                            <?php if ($property['is_featured']): ?>
+                                <div class="property-badge">Featured</div>
+                            <?php endif; ?>
                         </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-
-        <div class="dashboard-section" id="messages-section">
-            <div class="section-header">
-                <h2>Your Messages</h2>
-                <a href="messages.php" class="view-all">
-                    View All <i class="fas fa-arrow-right"></i>
-                </a>
-            </div>
-
-            <div class="messages-container">
-                <div class="messages-header">
-                    <h3>Recent Conversations</h3>
-                    <button class="new-message-btn">
-                        <i class="fas fa-plus"></i> New Message
-                    </button>
-                </div>
-
-                <div class="conversation-list">
-                    <!-- Sample conversation 1 -->
-                    <div class="conversation active">
-                        <div class="agent-avatar">JS</div>
-                        <div class="conversation-details">
-                            <div class="conversation-header">
-                                <h4>John Smith</h4>
-                                <span class="message-time">2 hours ago</span>
+                        <div class="property-details">
+                            <h3><?php echo htmlspecialchars($property['title']); ?></h3>
+                            <div class="property-price">$<?php echo number_format($property['price'], 2); ?></div>
+                            <div class="property-meta">
+                                <span><i class="fas fa-bed"></i> <?php echo htmlspecialchars($property['bedrooms']); ?>
+                                    Beds</span>
+                                <span><i class="fas fa-bath"></i> <?php echo htmlspecialchars($property['bathrooms']); ?>
+                                    Baths</span>
+                                <span><i class="fas fa-ruler-combined"></i>
+                                    <?php echo htmlspecialchars($property['square_feet']); ?> sqft</span>
                             </div>
-                            <p class="message-preview">Yes, we can schedule a viewing for tomorrow at 3 PM...
+                            <div class="property-location">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <?php echo htmlspecialchars($property['city'] . ', ' . $property['state']); ?>
+                            </div>
+                            <p class="property-description">
+                                <?php echo substr(htmlspecialchars($property['description']), 0, 100); ?>...
                             </p>
-                        </div>
-                        <div class="unread-indicator">2</div>
-                    </div>
-
-                    <!-- Sample conversation 2 -->
-                    <div class="conversation">
-                        <div class="agent-avatar">MJ</div>
-                        <div class="conversation-details">
-                            <div class="conversation-header">
-                                <h4>Maria Johnson</h4>
-                                <span class="message-time">Yesterday</span>
-                            </div>
-                            <p class="message-preview">I've found a property that matches your criteria...</p>
+                            <button class="view-btn view-details-btn" data-id="<?php echo $property['id']; ?>">View
+                                Details</button>
                         </div>
                     </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <p style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                    No properties found matching your criteria.
+                </p>
+            <?php endif; ?>
+        </div>
 
-                    <!-- Sample conversation 3 -->
-                    <div class="conversation">
-                        <div class="agent-avatar">RP</div>
-                        <div class="conversation-details">
-                            <div class="conversation-header">
-                                <h4>Robert Parker</h4>
-                                <span class="message-time">2 days ago</span>
-                            </div>
-                            <p class="message-preview">The seller has accepted your offer! Next steps...</p>
+        <!-- Property Details Modal -->
+        <div class="modal" id="propertyModal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+
+                <div class="modal-header">
+                    <img src="" alt="Property Image" class="modal-main-image" id="modalMainImage">
+                    <div class="modal-image-nav">
+                        <div class="nav-arrow prev-arrow">
+                            <i class="fas fa-chevron-left"></i>
                         </div>
+                        <div class="nav-arrow next-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                    <div class="modal-image-thumbnails" id="imageThumbnails">
+                        <!-- Thumbnails will be added here dynamically -->
+                    </div>
+                </div>
+
+                <div class="modal-body">
+                    <div class="modal-left">
+                        <h2 class="modal-title" id="modalTitle"></h2>
+                        <div class="modal-price" id="modalPrice"></div>
+
+                        <div class="modal-location">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span id="locationText"></span>
+                        </div>
+
+                        <div class="modal-meta">
+                            <div class="meta-item">
+                                <div class="meta-value" id="metaBedrooms"></div>
+                                <div class="meta-label">Bedrooms</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-value" id="metaBathrooms"></div>
+                                <div class="meta-label">Bathrooms</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-value" id="metaSqft"></div>
+                                <div class="meta-label">Sq. Feet</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-value" id="metaLotSize"></div>
+                                <div class="meta-label">Lot Size</div>
+                            </div>
+                        </div>
+
+                        <div class="modal-description" id="modalDescription"></div>
+
+                        <div class="modal-features">
+                            <div class="feature-item">
+                                <i class="fas fa-home"></i>
+                                <span>Type: <span id="modalPropertyType"></span></span>
+                            </div>
+                            <div class="feature-item">
+                                <i class="fas fa-tag"></i>
+                                <span>Status: <span id="modalStatus"></span></span>
+                            </div>
+                            <div class="feature-item">
+                                <i class="fas fa-calendar"></i>
+                                <span>Listed: <span id="modalCreatedAt"></span></span>
+                            </div>
+                            <div class="feature-item">
+                                <i class="fas fa-building"></i>
+                                <span>Year Built: <span id="modalYearBuilt"></span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-right">
+                        <div class="agent-card">
+                            <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80"
+                                alt="Agent" class="agent-avatar">
+                            <div class="agent-info">
+                                <h4>Alex Morgan</h4>
+                                <p>Listing Agent</p>
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button class="modal-btn contact-btn">
+                                <i class="fas fa-envelope"></i> Contact Agent
+                            </button>
+                            <button class="modal-btn favorite-btn-modal" id="save-property-btn">
+                                <i class="far fa-heart"></i> Save Property
+                            </button>
+                            <button class="modal-btn">
+                                <i class="fas fa-print"></i> Print Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <div class="property-id">
+                        <i class="fas fa-fingerprint"></i>
+                        Property ID: <span id="modalPropertyId"></span>
+                    </div>
+                    <div class="social-share">
+                        <a href="#" class="share-btn">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
+                        <a href="#" class="share-btn">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="share-btn">
+                            <i class="fab fa-linkedin-in"></i>
+                        </a>
+                        <a href="#" class="share-btn">
+                            <i class="fas fa-link"></i>
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Add this new Viewings Section -->
-        <div class="dashboard-section" id="viewings-section">
-            <div class="section-header">
-                <h2>Your Scheduled Viewings</h2>
-                <a href="#" class="view-all">
-                    View All <i class="fas fa-arrow-right"></i>
+        <!-- Pagination -->
+        <div class="pagination">
+            <?php
+            // Create base URL with current filters
+            $baseUrl = 'properties.php?';
+            $queryParams = $_GET;
+            unset($queryParams['page']);
+
+            if ($page > 1):
+                $prevParams = array_merge($queryParams, ['page' => $page - 1]);
+                ?>
+                <a href="<?= $baseUrl . http_build_query($prevParams) ?>" class="page-btn">
+                    <i class="fas fa-chevron-left"></i>
                 </a>
-            </div>
+            <?php endif; ?>
 
-            <div class="viewings-container">
-                <div class="viewings-header">
-                    <h3>Upcoming Appointments (3)</h3>
-                </div>
-
-                <div class="viewings-list">
-                    <!-- Viewing Card 1 -->
-                    <div class="viewing-card">
-                        <div class="viewing-image" style="background-image: url('property1.jpg');"></div>
-                        <div class="viewing-details">
-                            <h4>Modern Downtown Loft</h4>
-                            <div class="viewing-meta">
-                                <span><i class="far fa-calendar"></i> Tomorrow, 10:00 AM</span>
-                                <span><i class="fas fa-user-tie"></i> Agent: Sarah Johnson</span>
-                                <span class="status-badge confirmed">Confirmed</span>
-                            </div>
-                            <div class="viewing-actions">
-                                <button class="btn reschedule-btn"><i class="fas fa-calendar-edit"></i>
-                                    Reschedule</button>
-                                <button class="btn cancel-btn"><i class="fas fa-times-circle"></i>
-                                    Cancel</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Viewing Card 2 -->
-                    <div class="viewing-card">
-                        <div class="viewing-image" style="background-image: url('property2.jpg');"></div>
-                        <div class="viewing-details">
-                            <h4>Suburban Family Home</h4>
-                            <div class="viewing-meta">
-                                <span><i class="far fa-calendar"></i> June 25, 2:30 PM</span>
-                                <span><i class="fas fa-user-tie"></i> Agent: Michael Chen</span>
-                                <span class="status-badge pending">Pending Confirmation</span>
-                            </div>
-                            <div class="viewing-actions">
-                                <button class="btn confirm-btn"><i class="fas fa-check-circle"></i>
-                                    Confirm</button>
-                                <button class="btn cancel-btn"><i class="fas fa-times-circle"></i>
-                                    Cancel</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Add this new Agents Section -->
-        <div class="dashboard-section" id="agents-section">
-            <div class="section-header">
-                <h2>Your Real Estate Agents</h2>
-                <a href="#" class="view-all">
-                    Find New Agents <i class="fas fa-arrow-right"></i>
+            <?php for ($i = 1; $i <= $totalPages; $i++):
+                $pageParams = array_merge($queryParams, ['page' => $i]);
+                ?>
+                <a href="<?= $baseUrl . http_build_query($pageParams) ?>"
+                    class="page-btn <?= $i == $page ? 'active' : '' ?>">
+                    <?= $i ?>
                 </a>
-            </div>
+            <?php endfor; ?>
 
-            <div class="agents-container">
-                <div class="agents-header">
-                    <h3>Your Trusted Partners (3)</h3>
-                    <div class="agent-search">
-                        <input type="text" placeholder="Search agents..." id="agent-search-input">
-                        <i class="fas fa-search"></i>
-                    </div>
-                </div>
-
-                <div class="agents-grid">
-                    <!-- Agent Card 1 -->
-                    <div class="agent-card">
-                        <div class="agent-avatar" style="background-image: url('agent1.jpg');"></div>
-                        <div class="agent-details">
-                            <h4>Sarah Johnson</h4>
-                            <div class="agent-rating">
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star-half-alt"></i>
-                                <span>4.7 (128 reviews)</span>
-                            </div>
-                            <div class="agent-meta">
-                                <span><i class="fas fa-home"></i> 12 properties</span>
-                                <span><i class="fas fa-map-marker-alt"></i> Downtown</span>
-                            </div>
-                            <div class="agent-contact">
-                                <span><i class="fas fa-phone"></i> (555) 123-4567</span>
-                                <span><i class="fas fa-envelope"></i> sarah@realestate.com</span>
-                            </div>
-                            <div class="agent-actions">
-                                <button class="btn contact-btn"><i class="fas fa-comment"></i> Message</button>
-                                <button class="btn schedule-btn"><i class="fas fa-calendar"></i> Schedule
-                                    Call</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Agent Card 2 -->
-                    <div class="agent-card">
-                        <div class="agent-avatar" style="background-image: url('agent2.jpg');"></div>
-                        <div class="agent-details">
-                            <h4>Michael Chen</h4>
-                            <div class="agent-rating">
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="far fa-star"></i>
-                                <span>4.3 (97 reviews)</span>
-                            </div>
-                            <div class="agent-meta">
-                                <span><i class="fas fa-home"></i> 8 properties</span>
-                                <span><i class="fas fa-map-marker-alt"></i> Suburbs</span>
-                            </div>
-                            <div class="agent-contact">
-                                <span><i class="fas fa-phone"></i> (555) 987-6543</span>
-                                <span><i class="fas fa-envelope"></i> michael@realestate.com</span>
-                            </div>
-                            <div class="agent-actions">
-                                <button class="btn contact-btn"><i class="fas fa-comment"></i> Message</button>
-                                <button class="btn schedule-btn"><i class="fas fa-calendar"></i> Schedule
-                                    Call</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Agent Card 3 -->
-                    <div class="agent-card">
-                        <div class="agent-avatar" style="background-image: url('agent3.jpg');"></div>
-                        <div class="agent-details">
-                            <h4>Robert Parker</h4>
-                            <div class="agent-rating">
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <span>5.0 (56 reviews)</span>
-                            </div>
-                            <div class="agent-meta">
-                                <span><i class="fas fa-home"></i> 5 properties</span>
-                                <span><i class="fas fa-map-marker-alt"></i> Luxury Homes</span>
-                            </div>
-                            <div class="agent-contact">
-                                <span><i class="fas fa-phone"></i> (555) 456-7890</span>
-                                <span><i class="fas fa-envelope"></i> robert@realestate.com</span>
-                            </div>
-                            <div class="agent-actions">
-                                <button class="btn contact-btn"><i class="fas fa-comment"></i> Message</button>
-                                <button class="btn schedule-btn"><i class="fas fa-calendar"></i> Schedule
-                                    Call</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <?php if ($page < $totalPages):
+                $nextParams = array_merge($queryParams, ['page' => $page + 1]);
+                ?>
+                <a href="<?= $baseUrl . http_build_query($nextParams) ?>" class="page-btn">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            <?php endif; ?>
         </div>
-    </div>
 
-    <!-- Property Detail Modal -->
-    <div class="modal" id="property-modal">
-        <!-- Modal content will be populated by JavaScript -->
-    </div>
+        <!-- Footer -->
+        <footer>
+            <div class="footer-content">
+                <div class="footer-logo">RealEstate AI</div>
+                <p>Intelligent solutions for modern real estate needs</p>
 
-    <!-- Schedule Call Modal -->
-    <div class="modal" id="schedule-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Schedule a Call</h3>
-                <button class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="schedule-agent-info">
-                    <div class="agent-avatar-sm" id="schedule-agent-avatar"></div>
-                    <div>
-                        <h4 id="schedule-agent-name">Agent Name</h4>
-                        <p id="schedule-agent-specialty">Specialty</p>
-                    </div>
+                <div class="footer-links">
+                    <a href="index.php">Home</a>
+                    <a href="properties.php">Properties</a>
+                    <a href="about.php">About Us</a>
+                    <a href="contact.php">Contact</a>
+                    <a href="terms.php">Terms</a>
+                    <a href="privacy.php">Privacy</a>
                 </div>
 
-                <div class="form-group">
-                    <label>Select Date & Time</label>
-                    <input type="datetime-local" id="schedule-time">
-                </div>
-
-                <div class="form-group">
-                    <label>Meeting Type</label>
-                    <select id="meeting-type">
-                        <option value="phone">Phone Call</option>
-                        <option value="video">Video Conference</option>
-                        <option value="in-person">In-Person Meeting</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Notes (Optional)</label>
-                    <textarea id="meeting-notes" placeholder="Any specific topics you want to discuss..."></textarea>
+                <div class="copyright">
+                    &copy; <?php echo date('Y'); ?> Real Estate AI. All rights reserved.
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary close-btn">Cancel</button>
-                <button class="btn btn-primary" id="confirm-schedule">Schedule Call</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Profile Edit Modal -->
-    <div class="modal" id="profile-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Edit Profile</h3>
-                <button class="close-btn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="profile-form">
-                    <div class="form-group">
-                        <label>Username</label>
-                        <input type="text" id="profile-username" name="username" value="<?= $user['username'] ?>">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Profile Picture</label>
-                        <div class="profile-pic-preview" id="profile-pic-preview" style="width: 150px; height: 150px; border-radius: 50%; 
-               background-color: #f0f0f0; margin-bottom: 15px;
-               background-size: cover; background-position: center;
-               <?php if (isset($user['profile_pic']) && !empty($user['profile_pic'])): ?>
-                   background-image: url('<?= $user['profile_pic'] ?>')
-               <?php endif; ?>">
-                        </div>
-                        <input type="file" id="profile-pic" name="profile_pic" accept="image/*">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" id="profile-email" name="email" value="<?= $user['email'] ?>" readonly>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary close-btn">Cancel</button>
-                <button class="btn btn-primary" id="save-profile-btn">Save Changes</button>
-            </div>
-        </div>
+        </footer>
     </div>
 
     <script>
-        // Set current date
-        const now = new Date();
-        const options = {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        };
-        document.getElementById('current-date').textContent =
-            now.toLocaleDateString('en-US', options);
+        document.addEventListener("DOMContentLoaded", function () {
+            // Toast notification function
+            function showToast(message, isError = false) {
+                const toast = document.getElementById('saveToast');
+                toast.textContent = message;
+                toast.className = 'toast' + (isError ? ' error' : '');
+                toast.classList.add('show');
 
-        // Fixed active sidebar link management
-        const navLinks = document.querySelectorAll('.sidebar .nav-link');
-        const sections = document.querySelectorAll('.dashboard-section, #top-section');
-
-        // Function to set active link
-        function setActiveLink() {
-            // Find the section closest to the top of the viewport
-            let closestSection = null;
-            let minDistance = Number.MAX_SAFE_INTEGER;
-
-            sections.forEach(section => {
-                const rect = section.getBoundingClientRect();
-                const distance = Math.abs(rect.top);
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestSection = section;
-                }
-            });
-
-            // Update active link
-            if (closestSection) {
-                const targetId = closestSection.getAttribute('id');
-                navLinks.forEach(link => {
-                    link.classList.remove('active');
-                    if (link.getAttribute('href') === `#${targetId}`) {
-                        link.classList.add('active');
-                    }
-                });
-            }
-        }
-
-        // Set active link on scroll
-        window.addEventListener('scroll', setActiveLink);
-
-        // Set active link on click
-        navLinks.forEach(link => {
-            link.addEventListener('click', function (e) {
-                e.preventDefault();
-
-                // Remove active class from all
-                navLinks.forEach(link => link.classList.remove('active'));
-
-                // Add active to clicked link
-                this.classList.add('active');
-
-                // Scroll to target
-                const targetId = this.getAttribute('href');
-                if (targetId === '#top-section') {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                } else {
-                    const targetSection = document.querySelector(targetId);
-                    if (targetSection) {
-                        targetSection.scrollIntoView({ behavior: 'smooth' });
-                    }
-                }
-            });
-        });
-
-        // Initialize active link
-        setActiveLink();
-
-        // Location dropdown functionality
-        document.getElementById('location-input').addEventListener('input', function () {
-            const input = this.value.toLowerCase();
-            const dropdown = document.getElementById('location-dropdown');
-            const options = dropdown.getElementsByTagName('div');
-
-            if (input.length > 1) {
-                dropdown.classList.add('show');
-            } else {
-                dropdown.classList.remove('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
             }
 
-            for (let i = 0; i < options.length; i++) {
-                const text = options[i].textContent.toLowerCase();
-                if (text.includes(input)) {
-                    options[i].style.display = 'block';
-                } else {
-                    options[i].style.display = 'none';
-                }
-            }
-        });
-
-        function selectLocation(location) {
-            document.getElementById('location-input').value = location;
-            document.getElementById('location-dropdown').classList.remove('show');
-        }
-
-        // Close dropdown when clicking outside
-        window.addEventListener('click', function (e) {
-            if (!e.target.matches('#location-input')) {
-                document.getElementById('location-dropdown').classList.remove('show');
-            }
-        });
-
-        // Favorite button functionality
-        document.addEventListener('click', function (e) {
-            if (e.target.closest('.favorite-btn')) {
-                const btn = e.target.closest('.favorite-btn');
-                const propertyId = btn.dataset.id;
-                const isFavorite = btn.classList.contains('active');
-
-                // Toggle UI immediately for better UX
-                const icon = btn.querySelector('i');
-                if (isFavorite) {
-                    icon.classList.remove('fas');
-                    icon.classList.add('far');
-                    btn.classList.remove('active');
-                } else {
-                    icon.classList.remove('far');
-                    icon.classList.add('fas');
-                    btn.classList.add('active');
-                }
-
-                // Send AJAX request to update database
-                const formData = new FormData();
-                formData.append('property_id', propertyId);
-                formData.append('is_favorite', !isFavorite);
-
-                fetch('buyer_dashboard.php', {
+            // Save property function
+            function saveProperty(propertyId, buttonElement) {
+                fetch('save_property.php', {
                     method: 'POST',
-                    body: formData
-                });
-            }
-        });
-
-        // Smooth scrolling for sidebar links
-        document.getElementById('find-properties-link').addEventListener('click', function (e) {
-            e.preventDefault();
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-        });
-
-        document.getElementById('saved-properties-link').addEventListener('click', function (e) {
-            e.preventDefault();
-            const section = document.getElementById('saved-properties-section');
-            section.scrollIntoView({ behavior: 'smooth' });
-        });
-
-        document.getElementById('messages-link').addEventListener('click', function (e) {
-            e.preventDefault();
-            const section = document.getElementById('messages-section');
-            section.scrollIntoView({ behavior: 'smooth' });
-        });
-
-        // Property details modal
-        document.addEventListener('click', function (e) {
-            if (e.target.closest('.details-btn')) {
-                const card = e.target.closest('.property-card');
-                const propertyId = card.dataset.id;
-
-                fetch(`get_property_details.php?id=${propertyId}`)
-                    .then(response => response.json())
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ property_id: propertyId })
+                })
+                    .then(response => {
+                        if (response.status === 401) {
+                            // Redirect to login with current URL
+                            const redirect = encodeURIComponent(window.location.href);
+                            window.location.href = `signin.html?redirect=${redirect}`;
+                            return;
+                        }
+                        return response.json();
+                    })
                     .then(data => {
-                        const modal = document.getElementById('property-modal');
-                        modal.querySelector('#modal-title').textContent = data.title;
-                        modal.querySelector('#modal-price').textContent = '$' +
-                            new Intl.NumberFormat().format(data.price);
-                        modal.querySelector('#modal-beds').textContent = data.bedrooms;
-                        modal.querySelector('#modal-baths').textContent = data.bathrooms;
-                        modal.querySelector('#modal-sqft').textContent =
-                            new Intl.NumberFormat().format(data.square_feet);
-                        modal.querySelector('#modal-address').textContent = data.address;
-                        modal.querySelector('#modal-image').style.backgroundImage =
-                            `url('${data.image_path}')`;
-                        modal.querySelector('.modal-description p').textContent =
-                            data.description;
-
-                        modal.classList.add('active');
+                        if (data?.success) {
+                            buttonElement.querySelector('i').className = 'fas fa-heart';
+                            buttonElement.disabled = true;
+                            showToast('Property saved to your favorites!');
+                        } else if (data?.error) {
+                            showToast(data.error, true);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Save error:', error);
+                        showToast('Failed to save. Please try again.', true);
                     });
             }
-        });
 
-        // Logout functionality
-        document.getElementById('logout-btn').addEventListener('click', function () {
-            if (confirm('Are you sure you want to log out?')) {
-                window.location.href = 'logout.php';
-            }
-        });
+            // Save button in modal
+            document.getElementById('save-property-btn').addEventListener('click', function () {
+                const propertyId = this.dataset.propertyId;
+                saveProperty(propertyId, this);
+            });
 
-        // Profile picture preview functionality
-        function handleProfilePicPreview() {
-            const fileInput = document.getElementById('profile-pic');
-            const preview = document.getElementById('profile-pic-preview');
+            // Favorite buttons on property cards
+            document.querySelectorAll('.favorite-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const propertyCard = this.closest('.property-card');
+                    const viewBtn = propertyCard.querySelector('.view-details-btn');
+                    const propertyId = viewBtn.dataset.id;
 
-            fileInput.addEventListener('change', function () {
-                if (this.files && this.files[0]) {
-                    const reader = new FileReader();
+                    saveProperty(propertyId, this);
+                });
+            });
 
-                    reader.onload = function (e) {
-                        preview.style.backgroundImage = `url(${e.target.result})`;
+            // View Details button click handler
+            document.addEventListener('click', function (event) {
+                if (event.target.classList.contains('view-details-btn')) {
+                    const propertyId = event.target.getAttribute('data-id');
+                    showPropertyDetails(propertyId);
+                }
+            });
+
+            // Show property details in modal
+            function showPropertyDetails(propertyId) {
+                // Find the property in the PHP array
+                const properties = <?php echo json_encode($properties); ?>;
+                const property = properties.find(p => p.id == propertyId);
+
+                if (property) {
+                    // Update modal content
+                    document.getElementById('modalTitle').textContent = property.title;
+                    document.getElementById('modalPrice').textContent = '$' +
+                        parseFloat(property.price).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+
+                    document.getElementById('locationText').textContent =
+                        property.address + ', ' + property.city + ', ' + property.state + ' ' + property.zip_code;
+
+                    document.getElementById('metaBedrooms').textContent = property.bedrooms;
+                    document.getElementById('metaBathrooms').textContent = property.bathrooms;
+                    document.getElementById('metaSqft').textContent =
+                        property.square_feet.toLocaleString();
+                    document.getElementById('metaLotSize').textContent =
+                        property.lot_size ? property.lot_size + ' acres' : 'N/A';
+                    document.getElementById('modalYearBuilt').textContent =
+                        property.year_built || 'N/A';
+
+                    document.getElementById('modalDescription').textContent = property.description;
+                    document.getElementById('modalPropertyType').textContent = property.property_type;
+                    document.getElementById('modalStatus').textContent = property.status;
+                    document.getElementById('modalPropertyId').textContent = 'REA-' + property.id;
+
+                    // Format date
+                    const date = new Date(property.created_at);
+                    document.getElementById('modalCreatedAt').textContent =
+                        date.toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        });
+
+                    // Set main image
+                    const mainImage = document.getElementById('modalMainImage');
+                    mainImage.src = property.image_url;
+                    mainImage.alt = property.title;
+
+                    // Create image thumbnails (using the same image for demo)
+                    const thumbnailsContainer = document.getElementById('imageThumbnails');
+                    thumbnailsContainer.innerHTML = '';
+
+                    // Declare variables here
+                    const propertyImages = [];
+                    let currentImageIndex = 0;
+
+                    // For demo, we'll create 5 thumbnails using the same image
+                    for (let i = 0; i < 5; i++) {
+                        propertyImages.push(property.image_url);
+                        const thumbnail = document.createElement('img');
+                        thumbnail.src = property.image_url;
+                        thumbnail.alt = `Property image ${i + 1}`;
+                        thumbnail.className = 'modal-thumbnail';
+                        if (i === 0) thumbnail.classList.add('active');
+
+                        thumbnail.addEventListener('click', function () {
+                            // Update main image
+                            mainImage.src = this.src;
+                            currentImageIndex = i;
+
+                            // Update active thumbnail
+                            document.querySelectorAll('.modal-thumbnail').forEach(t => {
+                                t.classList.remove('active');
+                            });
+                            this.classList.add('active');
+                        });
+
+                        thumbnailsContainer.appendChild(thumbnail);
                     }
 
-                    reader.readAsDataURL(this.files[0]);
+                    // Set up arrow navigation
+                    document.querySelector('.prev-arrow').addEventListener('click', function () {
+                        currentImageIndex = (currentImageIndex - 1 + propertyImages.length) % propertyImages.length;
+                        updateMainImage();
+                    });
+
+                    document.querySelector('.next-arrow').addEventListener('click', function () {
+                        currentImageIndex = (currentImageIndex + 1) % propertyImages.length;
+                        updateMainImage();
+                    });
+
+                    // Helper function for image updates
+                    function updateMainImage() {
+                        const mainImage = document.getElementById('modalMainImage');
+                        mainImage.src = propertyImages[currentImageIndex];
+
+                        // Update active thumbnail
+                        const thumbnails = document.querySelectorAll('.modal-thumbnail');
+                        thumbnails.forEach((t, i) => {
+                            t.classList.toggle('active', i === currentImageIndex);
+                        });
+
+                        // Add zoom effect
+                        mainImage.style.transform = 'scale(1.05)';
+                        setTimeout(() => {
+                            mainImage.style.transform = 'scale(1)';
+                        }, 300);
+                    }
+
+                    // NEW: Update save button with property ID
+                    const saveBtn = document.getElementById('save-property-btn');
+                    saveBtn.dataset.propertyId = property.id;
+
+                    // Reset button state for new property
+                    saveBtn.disabled = false;
+                    saveBtn.querySelector('i').className = 'far fa-heart';
+
+                    // Show the modal
+                    const modal = document.getElementById('propertyModal');
+                    modal.style.display = 'block';
+                    setTimeout(() => {
+                        modal.classList.add('active');
+                    }, 10);
                 }
+            }
+
+            // NEW: Save button in modal
+            document.getElementById('save-property-btn').addEventListener('click', function () {
+                const propertyId = this.dataset.propertyId;
+                saveProperty(propertyId, this);
             });
-        }
 
-        // Property card click functionality
-        document.querySelectorAll(".property-card").forEach((card) => {
-            card.addEventListener("click", function (e) {
-                if (!e.target.closest("button")) {
-                    const propertyTitle = this.querySelector("h3").textContent;
-                    alert(`Viewing details for: ${propertyTitle}`);
-                }
+            // NEW: Favorite buttons on property cards
+            document.querySelectorAll('.favorite-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const propertyId = this.closest('.property-card')
+                        .querySelector('.view-details-btn').dataset.id;
+
+                    saveProperty(propertyId, this);
+                });
             });
-        });
 
-        // Reset button functionality
-        document.getElementById('reset-btn').addEventListener('click', function () {
-            // Reset form fields
-            document.getElementById('location-input').value = '';
-            document.getElementById('type-select').value = 'any';
-            document.getElementById('price-select').value = 'any';
-            document.getElementById('beds-select').value = '0';
+            // Close modal functionality
+            const modal = document.getElementById('propertyModal');
+            const closeModal = document.querySelector('.close-modal');
 
-            // Also reset the form to clear any submitted data
-            document.getElementById('search-form').reset();
-
-            // Optionally reload the page to clear search results
-            // window.location.href = window.location.pathname;
-        });
-
-        document.getElementById('viewings-link').addEventListener('click', function (e) {
-            e.preventDefault();
-            const section = document.getElementById('viewings-section');
-            section.scrollIntoView({ behavior: 'smooth' });
-        });
-
-        // Add action handlers
-        document.querySelectorAll('.reschedule-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                alert('Reschedule functionality would open here');
-                // Would typically open a modal with calendar
+            // Close modal when clicking X
+            closeModal.addEventListener('click', function () {
+                modal.classList.remove('active');
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 300);
             });
-        });
 
-        document.querySelectorAll('.cancel-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-                if (confirm('Are you sure you want to cancel this viewing?')) {
-                    this.closest('.viewing-card').remove();
-                    showToast('Viewing cancelled successfully');
-                }
-            });
-        });
-
-        document.querySelectorAll('.confirm-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-                this.closest('.viewing-card').querySelector('.status-badge').textContent = 'Confirmed';
-                this.closest('.viewing-card').querySelector('.status-badge').className = 'status-badge confirmed';
-                this.remove();
-                showToast('Viewing confirmed!');
-            });
-        });
-
-        // Add to existing toast function
-        function showToast(message, isError = false) {
-            const toast = document.createElement('div');
-            toast.className = `toast ${isError ? 'error' : ''}`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-
-            setTimeout(() => toast.classList.add('show'), 100);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        document.getElementById('agents-link').addEventListener('click', function (e) {
-            e.preventDefault();
-            const section = document.getElementById('agents-section');
-            section.scrollIntoView({ behavior: 'smooth' });
-        });
-
-        // Agent search functionality
-        document.getElementById('agent-search-input').addEventListener('input', function () {
-            const searchTerm = this.value.toLowerCase();
-            document.querySelectorAll('.agent-card').forEach(card => {
-                const agentName = card.querySelector('h4').textContent.toLowerCase();
-                if (agentName.includes(searchTerm)) {
-                    card.style.display = 'flex';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        });
-
-        // Schedule call functionality
-        document.querySelectorAll('.schedule-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-                const card = this.closest('.agent-card');
-                const agentName = card.querySelector('h4').textContent;
-                const agentAvatar = card.querySelector('.agent-avatar').style.backgroundImage;
-                const agentSpecialty = card.querySelector('.agent-meta span:nth-child(2)').textContent;
-
-                document.getElementById('schedule-agent-name').textContent = agentName;
-                document.getElementById('schedule-agent-specialty').textContent = agentSpecialty;
-                document.getElementById('schedule-agent-avatar').style.backgroundImage = agentAvatar;
-
-                document.getElementById('schedule-modal').classList.add('active');
-            });
-        });
-
-        // Close modal functionality
-        document.querySelectorAll('.close-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-                document.querySelectorAll('.modal').forEach(modal => {
+            // Close modal when clicking outside content
+            window.addEventListener('click', function (event) {
+                if (event.target === modal) {
                     modal.classList.remove('active');
-                });
-            });
-        });
-
-        // Update profile save functionality
-        document.getElementById('save-profile-btn').addEventListener('click', function (e) {
-            e.preventDefault();
-            const username = document.getElementById('profile-username').value;
-            const fileInput = document.getElementById('profile-pic');
-
-            const formData = new FormData();
-            formData.append('username', username);
-            if (fileInput.files.length > 0) {
-                formData.append('profile_pic', fileInput.files[0]);
-            }
-
-            fetch('update_profile.php', {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Update username display
-                        document.getElementById('username-display').textContent = data.username;
-
-                        // Update profile picture
-                        const userAvatar = document.querySelector('.user-avatar');
-                        if (data.profile_pic) {
-                            userAvatar.innerHTML = `<img src="${data.profile_pic}" alt="Profile Picture">`;
-                        } else {
-                            // Fallback to initials
-                            const initials = data.username.substring(0, 2).toUpperCase();
-                            userAvatar.textContent = initials;
-                        }
-
-                        showToast('Profile updated successfully!');
-                        document.getElementById('profile-modal').classList.remove('active');
-                    } else {
-                        showToast(data.error || 'Error updating profile', true);
-                    }
-                })
-                .catch(error => {
-                    showToast('An error occurred. Please try again.', true);
-                });
-        });
-
-        // Add this to handle modal close on overlay click
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', function (e) {
-                if (e.target === this) {
-                    this.classList.remove('active');
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                    }, 300);
                 }
-            });
-        });
-
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', function () {
-            // Initialize profile picture preview
-            handleProfilePicPreview();
-
-            // Add event listener for edit profile button
-            document.getElementById('edit-username-btn').addEventListener('click', function (e) {
-                e.preventDefault();
-                document.getElementById('profile-modal').classList.add('active');
             });
         });
     </script>
+    <div class="toast" id="saveToast"></div>
 </body>
 
 </html>
