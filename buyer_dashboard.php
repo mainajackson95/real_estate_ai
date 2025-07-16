@@ -86,42 +86,6 @@ while ($row = $locations_result->fetch_assoc()) {
 
 // Process search filters
 $search_results = [];
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['search'])) {
-    $location = $_GET['location'] ?? '';
-    $type = $_GET['type'] ?? 'any';
-    $price = $_GET['price'] ?? 'any';
-    $beds = $_GET['beds'] ?? 0;
-
-    // Build SQL query with filters
-    $search_sql = "SELECT p.*, 
-                  (SELECT image_path FROM property_images WHERE property_id = p.id LIMIT 1) AS image_path,
-                  (SELECT COUNT(*) FROM saved_properties WHERE property_id = p.id AND buyer_id = $user_id) AS is_favorite
-                  FROM properties p
-                  WHERE p.status = 'available'";
-
-    if (!empty($location)) {
-        list($city, $state) = explode(', ', $location);
-        $search_sql .= " AND p.city = '$city' AND p.state = '$state'";
-    }
-
-    if ($type !== 'any') {
-        $search_sql .= " AND p.property_type = '$type'";
-    }
-
-    if ($price !== 'any') {
-        list($minPrice, $maxPrice) = explode('-', $price);
-        $search_sql .= " AND p.price BETWEEN $minPrice AND $maxPrice";
-    }
-
-    if ($beds > 0) {
-        $search_sql .= " AND p.bedrooms >= $beds";
-    }
-
-    $search_result = $conn->query($search_sql);
-    while ($row = $search_result->fetch_assoc()) {
-        $search_results[] = $row;
-    }
-}
 
 // Fetch property types for the dropdown
 $property_types_sql = "SELECT DISTINCT property_type FROM properties ORDER BY property_type";
@@ -1659,7 +1623,7 @@ while ($row = $property_types_result->fetch_assoc()) {
                 <h2>Advanced Property Search</h2>
             </div>
 
-            <form method="GET" id="search-form">
+            <form method="GET" action="properties.php" id="search-form">
                 <div class="search-filters">
                     <div class="filter-group">
                         <label>Location</label>
@@ -1708,7 +1672,7 @@ while ($row = $property_types_result->fetch_assoc()) {
                     <!-- Bedrooms Filter -->
                     <div class=" filter-group">
                         <label>Bedrooms</label>
-                        <select id="beds-select" name="beds">
+                        <select id="beds-select" name="bedrooms">
                             <option value="0" <?= ($_GET['beds'] ?? 0) == 0 ? 'selected' : '' ?>>Any
                             </option>
                             <option value="1" <?= ($_GET['beds'] ?? 0) == 1 ? 'selected' : '' ?>>1+
@@ -1724,35 +1688,17 @@ while ($row = $property_types_result->fetch_assoc()) {
                 </div>
 
                 <div class="search-actions">
-                    <button type="button" class="reset-btn" id="reset-btn">Reset Filters</button>
+                    <button type="reset" class="reset-btn">Reset Filters</button>
                     <button type="submit" class="search-btn" name="search">
                         <i class="fas fa-search"></i> Search Properties
                     </button>
                 </div>
+
+                <input type="hidden" name="min_price" id="min_price">
+                <input type="hidden" name="max_price" id="max_price">
+
             </form>
         </div>
-
-        <!-- Search Results -->
-        <?php if (!empty($search_results)): ?>
-            <div class="search-results-message show">
-                <i class="fas fa-info-circle"></i>
-                <span>Found
-                    <?= count($search_results) ?> properties matching your search
-                </span>
-            </div>
-
-            <div class="dashboard-section">
-                <div class="section-header">
-                    <h2>Search Results</h2>
-                </div>
-
-                <div class="property-grid">
-                    <?php foreach ($search_results as $property): ?>
-                        <?php include 'property_card.php'; ?>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        <?php endif; ?>
 
         <!-- Recommended Properties Section -->
         <div class="dashboard-section">
@@ -2296,6 +2242,20 @@ while ($row = $property_types_result->fetch_assoc()) {
                         modal.classList.add('active');
                     });
             }
+        });
+
+        document.getElementById('search-form').addEventListener('submit', function (e) {
+            const price = document.getElementById('price-select').value;
+
+            if (price !== 'any') {
+                const [minPrice, maxPrice] = price.split('-');
+                document.getElementById('min_price').value = minPrice;
+                document.getElementById('max_price').value = maxPrice;
+            }
+
+            // Keep bedrooms parameter name consistent
+            const bedsSelect = document.getElementById('beds-select');
+            bedsSelect.name = 'bedrooms';
         });
 
         // Logout functionality
