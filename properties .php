@@ -804,7 +804,7 @@ $conn->close(); // Close the database connection
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: var(--primary-teal);
+            background: #0d9488;
             color: white;
             padding: 15px 25px;
             border-radius: 8px;
@@ -821,7 +821,7 @@ $conn->close(); // Close the database connection
         }
 
         .toast.error {
-            background: var(--secondary-coral);
+            background: #f87171;
         }
 
         .agent-card {
@@ -1617,7 +1617,7 @@ $conn->close(); // Close the database connection
                 }, 3000);
             }
 
-            // Generic save function
+            // Save property function
             function saveProperty(propertyId, buttonElement) {
                 fetch('save_property.php', {
                     method: 'POST',
@@ -1626,7 +1626,9 @@ $conn->close(); // Close the database connection
                 })
                     .then(response => {
                         if (response.status === 401) {
-                            window.location.href = `signin.html?redirect=${encodeURIComponent(window.location.href)}`;
+                            // Redirect to login with current URL
+                            const redirect = encodeURIComponent(window.location.href);
+                            window.location.href = `signin.html?redirect=${redirect}`;
                             return;
                         }
                         return response.json();
