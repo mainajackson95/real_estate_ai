@@ -4,7 +4,7 @@ session_start();
 // Database connection
 $servername = "localhost";
 $username = "root";
-$password = "";
+$password = "kaisec@2025";
 $dbname = "real_estate_ai_db";
 
 // Create connection
@@ -25,6 +25,12 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 $error_message = "";
 $success_message = "";
 
+// Image upload handling
+$upload_dir = 'uploads/properties/';
+if (!is_dir($upload_dir)) {
+    mkdir($upload_dir, 0777, true);
+}
+
 // Add new property
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_property'])) {
     $title = trim($_POST['title']);
@@ -38,52 +44,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_property'])) {
     $bathrooms = (float) $_POST['bathrooms'];
     $square_feet = (int) $_POST['square_feet'];
     $property_type = trim($_POST['property_type']);
-
-    $owner_id = $_SESSION['user_id'] ?? null;
     $agent_id = (int) $_POST['agent_id'];
+    $owner_id = (int) $_POST['owner_id'];
+
+    // Initialize image_paths array
+    $image_paths = [];
+
+    // Handle image uploads
+    if (!empty($_FILES['property_images']['name'][0])) {
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+
+        foreach ($_FILES['property_images']['tmp_name'] as $key => $tmp_name) {
+            $file_name = $_FILES['property_images']['name'][$key];
+            $file_type = $_FILES['property_images']['type'][$key];
+            $file_error = $_FILES['property_images']['error'][$key];
+
+            // Validate file type and size (2MB max)
+            if (
+                $file_error === UPLOAD_ERR_OK &&
+                in_array($file_type, $allowed_types) &&
+                $_FILES['property_images']['size'][$key] <= 2097152
+            ) {
+
+                $new_file_name = uniqid('img_', true) . '.' . pathinfo($file_name, PATHINFO_EXTENSION);
+                $destination = $upload_dir . $new_file_name;
+
+                if (move_uploaded_file($tmp_name, $destination)) {
+                    $image_paths[] = $destination;
+                }
+            }
+        }
+    }
 
     // Validate inputs
-    if (empty($title) || empty($address) || empty($city) || empty($state) || empty($zip_code)) {
+    if (empty($title) || empty($address) || empty($city) || empty($state) || empty($zip_code) || $agent_id <= 0 || $owner_id <= 0) {
         $error_message = "All required fields must be filled.";
-    } elseif (!$owner_id) {
-        $error_message = "User session invalid. Please log in again.";
-    } elseif (empty($_FILES['images']['name'][0])) {
-        $error_message = "At least one image is required.";
     } else {
-        // Add property to database
-        $stmt = $conn->prepare("INSERT INTO properties (title, description, price, address, city, state, zip_code, bedrooms, bathrooms, square_feet, property_type, owner_id, agent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssdssssiidsii", $title, $description, $price, $address, $city, $state, $zip_code, $bedrooms, $bathrooms, $square_feet, $property_type, $owner_id, $agent_id);
+        // In the property insertion block:
+        $stmt = $conn->prepare("INSERT INTO properties (...) VALUES (...)");
+        // Change bind_param type from "ssdssssiiisii" to "ssdssssiiisdd"
+        $stmt->bind_param(
+            "ssdssssiiisdd",
+            $title,
+            $description,
+            $price,
+            $address,
+            $city,
+            $state,
+            $zip_code,
+            $bedrooms,
+            $bathrooms,
+            $square_feet,
+            $property_type,
+            $agent_id,
+            $owner_id
+        );
 
         if ($stmt->execute()) {
             $property_id = $stmt->insert_id;
-            $success_message = "Property added successfully! ID: $property_id";
 
-            // Process uploaded images
-            $upload_dir = "uploads/";
-            if (!file_exists($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
-            }
-
-            $primary_set = false;
-            foreach ($_FILES['images']['tmp_name'] as $key => $tmp_name) {
-                $file_name = basename($_FILES['images']['name'][$key]);
-                $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-                $new_file_name = uniqid('img_', true) . '.' . $file_ext;
-                $upload_path = $upload_dir . $new_file_name;
-
-                if (move_uploaded_file($tmp_name, $upload_path)) {
-                    // Set first image as primary
-                    $is_primary = $primary_set ? 0 : 1;
-                    $primary_set = true;
-
-                    $img_stmt = $conn->prepare("INSERT INTO property_images (property_id, image_path, is_primary) VALUES (?, ?, ?)");
-                    $img_stmt->bind_param("isi", $property_id, $upload_path, $is_primary);
-                    $img_stmt->execute();
-                    $img_stmt->close();
-                } else {
-                    $error_message = "Error uploading image: " . $file_name;
+            // Insert images
+            if (!empty($image_paths)) {
+                $stmt_img = $conn->prepare("INSERT INTO property_images (property_id, image_path, is_primary) VALUES (?, ?, ?)");
+                $is_first = true;
+                foreach ($image_paths as $image_path) {
+                    $is_primary = $is_first ? 1 : 0;
+                    $stmt_img->bind_param("isi", $property_id, $image_path, $is_primary);
+                    $stmt_img->execute();
+                    $is_first = false;
                 }
+                $stmt_img->close();
             }
+            $success_message = "Property added successfully! ID: $property_id";
         } else {
             $error_message = "Error adding property: " . $stmt->error;
         }
@@ -295,11 +327,6 @@ if ($result->num_rows > 0) {
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-
-        .form-control[type="file"] {
-            padding: 10px;
-            height: auto;
         }
 
         .logout-btn:hover {
@@ -772,7 +799,9 @@ if ($result->num_rows > 0) {
                             <option value="">Select role</option>
                             <option value="admin">Admin</option>
                             <option value="agent">Agent</option>
-                            <option value="client">Client</option>
+                            <option value="buyer">Buyer</option>
+                            <option value="seller">Seller</option>
+                            <option value="investor">Investor</option>
                         </select>
                     </div>
                 </div>
@@ -917,24 +946,42 @@ if ($result->num_rows > 0) {
                 </div>
 
                 <div class="form-group">
-                    <label for="agent_id"><i class="fas fa-user-tie"></i> Agent*</label>
-                    <select id="agent_id" name="agent_id" class="form-control" required>
-                        <option value="">Select Agent</option>
-                        <?php
-                        $agents = $conn->query("SELECT id, username FROM users WHERE role='agent'");
-                        while ($agent = $agents->fetch_assoc()) {
-                            $selected = ($_SESSION['user_id'] == $agent['id']) ? 'selected' : '';
-                            echo "<option value='{$agent['id']}' $selected>{$agent['username']}</option>";
-                        }
-                        ?>
-                    </select>
+                    <label for="property_images"><i class="fas fa-images"></i> Property Images</label>
+                    <input type="file" id="property_images" name="property_images[]" class="form-control" multiple
+                        accept="image/*">
+                    <small class="text-muted">Select multiple images (JPEG, PNG, GIF)</small>
                 </div>
 
-                <div class="form-group">
-                    <label for="images"><i class="fas fa-images"></i> Property Images*</label>
-                    <input type="file" id="images" name="images[]" class="form-control" multiple accept="image/*"
-                        required>
-                    <small class="text-muted">Select multiple images (JPG, PNG, GIF, max 5MB each)</small>
+                <div class="form-row">
+                    <!-- Agent Selection -->
+                    <div class="form-group">
+                        <label for="agent_id"><i class="fas fa-user-tie"></i> Agent*</label>
+                        <select id="agent_id" name="agent_id" class="form-control" required>
+                            <option value="">Select Agent</option>
+                            <?php foreach ($users as $user): ?>
+                                <?php if ($user['role'] === 'agent'): ?>
+                                    <option value="<?php echo $user['id']; ?>">
+                                        <?php echo htmlspecialchars($user['username']); ?>
+                                    </option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- Owner Selection -->
+                    <div class="form-group">
+                        <label for="owner_id"><i class="fas fa-user"></i> Owner*</label>
+                        <select id="owner_id" name="owner_id" class="form-control" required>
+                            <option value="">Select Owner</option>
+                            <?php foreach ($users as $user): ?>
+                                <?php if ($user['role'] === 'seller' || $user['role'] === 'investor'): ?>
+                                    <option value="<?php echo $user['id']; ?>">
+                                        <?php echo htmlspecialchars($user['username']); ?>
+                                    </option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
 
                 <button type="submit" name="add_property" class="btn btn-primary">
@@ -947,9 +994,7 @@ if ($result->num_rows > 0) {
         <section class="properties-section">
             <div class="section-header">
                 <h2><i class="fas fa-building"></i> Manage Properties</h2>
-                <span>
-                    <?php echo count($properties); ?> Properties
-                </span>
+                <span><?php echo count($properties); ?> Properties</span>
             </div>
 
             <?php if (!empty($properties)): ?>
@@ -968,9 +1013,7 @@ if ($result->num_rows > 0) {
                         <?php foreach ($properties as $property): ?>
                             <tr>
                                 <td><?php echo $property['id']; ?></td>
-                                <td>
-                                    <?php echo htmlspecialchars($property['title']); ?>
-                                </td>
+                                <td><?php echo htmlspecialchars($property['title']); ?></td>
                                 <td><?php echo htmlspecialchars($property['address']); ?></td>
                                 <td>$<?php echo number_format($property['price']); ?></td>
                                 <td><?php echo htmlspecialchars($property['property_type']); ?></td>
@@ -1032,16 +1075,6 @@ if ($result->num_rows > 0) {
                 }
             });
         });
-        document.querySelectorAll('.action-delete').forEach(button => {
-            button.addEventListener('click', function (e) {
-                // Determine if it's property or user deletion
-                const isUser = this.closest('form').querySelector('[name="delete_user"]');
-
-                if (!confirm(`Are you sure you want to delete this ${isUser ? 'user' : 'property'}? This action cannot be undone.`)) {
-                    e.preventDefault();
-                }
-            });
-        })
     </script>
 </body>
 
