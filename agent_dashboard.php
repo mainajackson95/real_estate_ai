@@ -464,17 +464,28 @@ function getRecentListings($conn, $agent_id)
 {
   $sql = "SELECT p.id, p.title, p.price, p.status, p.bedrooms, 
                    p.bathrooms, p.square_feet, p.address,
-                   pi.image_path AS thumbnail
+                   (SELECT image_path FROM property_images 
+                    WHERE property_id = p.id AND is_primary = 1 
+                    LIMIT 1) AS thumbnail
             FROM properties p
-            LEFT JOIN property_images pi ON p.id = pi.property_id AND pi.is_primary = 1
             WHERE p.agent_id = ?
-            GROUP BY p.id
             ORDER BY p.created_at DESC 
             LIMIT 3";
 
   $stmt = $conn->prepare($sql);
+  if (!$stmt) {
+    error_log("Prepare failed: " . $conn->error);
+    return [];
+  }
+
   $stmt->bind_param("i", $agent_id);
-  $stmt->execute();
+
+  if (!$stmt->execute()) {
+    error_log("Execute failed: " . $stmt->error);
+    $stmt->close();
+    return [];
+  }
+
   $result = $stmt->get_result();
   $listings = [];
 
@@ -2459,12 +2470,9 @@ Beautiful 3-bedroom home in prime location. Open house this weekend!</textarea>
           // Handle thumbnail path
           let thumbnailStyle = "";
           if (listing.thumbnail) {
-            // Use correct path for uploaded images
-            thumbnailStyle = `background: url('uploads/${listing.thumbnail}') center/cover;`;
+            thumbnailStyle = `background: url('${listing.thumbnail}') center/cover;`;
           } else {
-            // Fallback to gradient
-            thumbnailStyle =
-              "background: linear-gradient(45deg, #0d9488, #0891b2);";
+            thumbnailStyle = "background: linear-gradient(45deg, #0d9488, #0891b2);";
           }
 
           return `
@@ -2480,16 +2488,14 @@ Beautiful 3-bedroom home in prime location. Open house this weekend!</textarea>
               listing.price || 0
             ).toLocaleString()}</div>
               <div class="property-meta">
-                <span><i class="fas fa-bed"></i> ${listing.bedrooms || 0
-            } Beds</span>
-                <span><i class="fas fa-bath"></i> ${listing.bathrooms || 0
-            } Baths</span>
+                <span><i class="fas fa-bed"></i> ${listing.bedrooms || 0} Beds</span>
+                <span><i class="fas fa-bath"></i> ${listing.bathrooms || 0} Baths</span>
                 <span><i class="fas fa-ruler-combined"></i> ${(
               listing.square_feet || 0
             ).toLocaleString()} sqft</span>
               </div>
               <p class="property-address">${escapeHTML(
-              listing.street || "Address not available"
+              listing.address || "Address not available"
             )}</p>
               <div class="property-actions">
                 <button class="edit-btn" data-id="${listing.id}">
