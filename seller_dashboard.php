@@ -4,18 +4,21 @@ require_once 'db_connection.php';
 
 // Check if user is logged in and is a seller
 if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'seller') {
-    header("Location: login.php");
+    header("Location: signin.html");
     exit();
 }
 
 $user_id = $_SESSION['user_id'];
 $username = isset($_SESSION['username']) ? $_SESSION['username'] : '';
 
-// Get seller's properties
+// Get seller's properties (FIXED: added placeholder handling)
 $properties = [];
 $stmt = $conn->prepare("
     SELECT p.*, 
-           (SELECT image_path FROM property_images WHERE property_id = p.id AND is_primary = 1 LIMIT 1) AS primary_image
+           COALESCE(
+               (SELECT image_path FROM property_images WHERE property_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1),
+               'placeholder' 
+           ) AS primary_image
     FROM properties p
     WHERE p.owner_id = ?
     ORDER BY p.created_at DESC
@@ -152,6 +155,22 @@ if ($result->num_rows > 0) {
             padding: 12px;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
+        }
+
+        .placeholder-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #666;
+            text-align: center;
+            z-index: 2;
+        }
+
+        .placeholder-text i {
+            display: block;
+            font-size: 2rem;
+            margin-bottom: 5px;
         }
 
         .user-avatar {
@@ -1040,14 +1059,14 @@ if ($result->num_rows > 0) {
                             $status_class = 'status-sold';
                         ?>
                         <div class="property-card" data-id="<?= $property['id'] ?>">
-                            <div class="property-image" style="background-image: url('<?=
-                                !empty($property['primary_image']) ?
-                                htmlspecialchars($property['primary_image']) :
-                                'images/property-placeholder.jpg'
-                                ?>')">
-                                <div class="property-status <?= $status_class ?>">
-                                    <?= ucfirst($property['status']) ?>
-                                </div>
+                            <div class="property-image"
+                                style="<?= ($property['primary_image'] !== 'placeholder') ? "background-image: url('" . htmlspecialchars($property['primary_image']) . "')" : 'background-color: #f0f0f0' ?>">
+                                <?php if ($property['primary_image'] === 'placeholder'): ?>
+                                    <div class="placeholder-text">
+                                        <i class="fas fa-home"></i>
+                                        <span>No Image</span>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                             <div class="property-details">
                                 <h3><?= htmlspecialchars($property['title']) ?></h3>
